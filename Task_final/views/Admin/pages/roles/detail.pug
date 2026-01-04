@@ -1,0 +1,23 @@
+extends ../../layouts/default.pug 
+include ../../mixins/alert.pug
+
+block main 
+    +alert-success(5000)
+    +alert-error(5000)
+    if(role.permissions.includes("roles_view"))
+        if(role.title)
+            h1(class="mb-4") #{role.title}
+        if(role.description)
+            div(class="mb-4")  !{role.description}
+        div(class="form-group")
+            a(
+                href=`${prefixAdmin}/roles`
+                class="btn btn-warning"
+            ) Tro ve
+            a(
+                href=`${prefixAdmin}/products/edit/${role.id}`
+                class="btn btn-danger btn-sm"
+            ) Sua
+        script(src="/Admin/Js/roles.js")
+    else 
+        h1 Bạn không có quyền

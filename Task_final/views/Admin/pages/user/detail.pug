@@ -1,0 +1,31 @@
+extends ../../layouts/default.pug  
+include ../../mixins/alert.pug
+
+block main 
+    +alert-success(5000)
+    +alert-error(5000)
+    if(role.permissions.includes("accounts_view"))
+        if(user.fullName)
+            h1 Thông tin của tài khoản: <b>#{user.fullName}</b>
+
+        if (user.avatar)
+            img(src=user.avatar width="150px" class="mb-3")
+        else 
+            img(src="admin/images/avatar.png" width="150px" class="mb-3")
+        if (user.email)
+            p Email: <b>#{user.email}</b>
+
+        if (user.phone)
+            p Số điện thoại: <b>#{user.phone}</b>
+
+        p   
+            span Trạng thái: 
+            span    
+                <b>#{user.status === "active" ? "Hoạt động" : "Dừng hoạt động"}</b>
+
+        a(
+            href=`${prefixAdmin}/users`
+            class="btn btn-warning"
+        ) Tro ve
+    else 
+        h1 Bạn không có quyền

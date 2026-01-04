@@ -1,0 +1,24 @@
+extends ../../layouts/default.pug
+include ../../mixins/alert.pug
+block main
+    +alert-success(5000)
+    +alert-error(5000)
+    if(role.permissions.includes("articles_edit"))
+        h3(class="card-title") Chỉnh sửa thông báo
+        form(action=`/admin/articles/edit/${post.id}?_method=PATCH`, method="post")
+            div(class="mb-3")
+                label(for="" class="form-label") Tiêu đề
+                input(type="text" name="title" id="title" class="form-control" value=post.title)
+            div(class="mb-3")
+                label(for="content" class="form-label") Nội dung
+                textarea(class="form-control tinymce-textarea" name="content" id="content") !{post.content}
+            div(class="mb-3") 
+                button(class="btn btn-primary") Sửa bài
+                a(
+                    href=`${prefixAdmin}/articles`
+                    class="btn btn-warning"
+                ) Tro ve
+        script(src="/Admin/Js/productScript.js")   
+    else    
+        h1 Bạn không có quyền 
+

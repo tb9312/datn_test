@@ -1,0 +1,23 @@
+mixin form-handle-multi(path)
+    form(
+        action=path
+        method="POST"
+        form-change-multi
+    )
+        .d-flex.align-items-start 
+            .form-group 
+                select(name="type" class="form-control")
+                    option(disabled selected) --Chọn hành động--
+                    option(value="initial") Chuẩn bị
+                    option(value="handle") Đang xử lý
+                    option(value="complete") Đã hoàn thành
+                    option(value="refuse")  Từ chối
+                    option(value="delete-all")  Xóa đơn hàng
+            .form-group 
+                input(
+                    type="text"
+                    name="ids"
+                    value=""
+                    class="form-control d-none"
+                )
+            button(type="submit" class="btn btn-primary") Áp dụng

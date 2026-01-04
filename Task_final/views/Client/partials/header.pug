@@ -1,0 +1,48 @@
+//- include ../mixins/sub-menu.pug
+
+header.header
+    .container 
+        .row.align-items-center
+            .col-3.d-flex
+                .inner-logo
+                    a(href="/api/v1/")
+                        img(src=settingGeneral.logo, alt="logo")
+                .inner-website
+                    a(href="/api/v1/")
+                        h2 #{settingGeneral.websiteName}
+            .col-5 
+                form(
+                    action="/search"
+                    method="GET"
+                )
+                    div(class="form-group d-flex mb-0")
+                        input(
+                            type="text"
+                            placeholder="Nhập từ khoá..."
+                            class="form-control mr-3"
+                            name="keyword"
+                            value=keyword
+                        )
+                        button(
+                            type="submt"
+                            class="btn btn-primary"
+                        ) Tìm
+            .col-4
+                .inner-menu
+                    ul
+                        li 
+                            a(href="/api/v1/") Trang chủ
+                        if (user)
+                            //-  
+                            li 
+                                a(href=`/api/v1/chat`) Chat 
+
+                            li 
+                                a(href="/api/v1/users/info") #{user.fullName}
+                            li 
+                                a(href="/api/v1/users/logout") Đăng xuất
+                        else
+                            li 
+                                a(href="/api/v1/users/login_get") Đăng nhập
+                            li 
+                                a(href="/api/v1/users/register") Đăng ký

@@ -1,0 +1,32 @@
+extends ../../layouts/default.pug 
+include ../../mixins/box-head.pug
+
+block main
+    .container
+        .row
+            .col-12 
+                +box-head(pageTitle)
+
+            if (user.fullName)
+                h1(class="mb-4") #{user.fullName}
+            if (user.avatar) 
+                div(class="mb-4") 
+                    img(
+                        src=user.avatar
+                        style="width: 100px"
+                    )
+            if (user.email)
+                div(class="mb-4") Email: <b>#{user.email}</b>
+
+            if (user.phone)
+                div(class="mb-4") Số điện thoại: <b>#{user.phone}</b>
+
+
+        a(
+            class="btn btn-danger"
+            href=`/user/edit`
+        ) Chỉnh sửa
+        a(
+            href=`/`
+            class="btn btn-warning"
+        ) Trở về

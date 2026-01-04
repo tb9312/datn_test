@@ -1,0 +1,46 @@
+extends ../../layouts/default.pug
+include  ../../mixins/pagination.pug
+include ../../mixins/alert.pug
+//- block styles
+    link(rel="stylesheet" href="/admin/css/create-post.css")
+block main
+    +alert-success(5000)
+    +alert-error(5000)
+    if(role.permissions.includes("articles_view"))
+        .main
+            .article
+                h1.heading Các bài viết 
+                if(role.permissions.includes("articles_create"))
+                    a.btn.btn-success.mb-3(href=`${prefixAdmin}/articles/create`) <i class="fa-solid fa-plus"></i> Thêm mới bài viêt 
+                .box-container
+                    each post in posts
+                        .box
+                            .content
+                                div(class="post-box mb-3")
+                                    h4(class="post-title") Tiêu đề bài viết: #{post.title}
+                                    div(class="post-content mb-3") Nội dung bài viết: !{post.content}
+                                div(class="post-footer d-flex justify-content-between align-items-center")
+                                    span(class="create-date") <b> #{post.createdAtStr} #{post.creator ? `by ${post.creator}` : ""}</b>
+                                    .form-action.d-flex.justify-content-end
+                                        if(role.permissions.includes("articles_edit"))
+                                            a(
+                                                href=`${prefixAdmin}/articles/edit/${post.id}`
+                                                class="btn btn-warning btn-sm"
+                                            ) Sửa bài
+                                        if(role.permissions.includes("articles_delete"))
+                                            button(
+                                                data-id=post.id
+                                                button-delete
+                                                class="btn btn-danger btn-sm ml-1"
+                                            ) Xóa bài
+
+                +Pagitation(pagitation) 
+        form(
+            action=""
+            method="POST"
+            id="form-delete-item"
+            data-path=`${prefixAdmin}/articles/delete`
+        ) 
+        script(src="/Admin/Js/articleScript.js")
+    else 
+        h1 Bạn không có quyền

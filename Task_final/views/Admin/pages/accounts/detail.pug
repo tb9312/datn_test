@@ -1,0 +1,49 @@
+extends ../../layouts/default.pug 
+include ../../mixins/alert.pug
+//- +alert-success(5000)
+//- +alert-error(5000)
+
+block main 
+    //- div #{role}
+    +alert-success(5000)
+    +alert-error(5000)
+
+    if (role.permissions.includes("accounts_view"))
+        if (account.fullName)
+            h1(class="mb-4") #{account.fullName}
+
+        if (account.email)
+            div(class="mb-4") Email: <b>#{account.email}</b>
+
+        if (account.phone)
+            div(class="mb-4") Số điện thoại: <b>#{account.phone}</b>
+
+        if (account.avatar) 
+            div(class="mb-4") 
+                img(
+                    src=account.avatar
+                    style="width: 100px"
+                )
+
+        if (account.status) 
+            div(class="mb-4")
+                span Trạng thái
+                if(account.status === "active")
+                    span(class="badge text-bg-success") Hoạt động
+                else  
+                    span(class="badge text-bg-danger") Dừng hoạt động
+        if (role.title)
+            p Phân quyền: <b>#{role.title}</b>
+
+        a(
+            class="btn btn-danger"
+            href=`${prefixAdmin}/accounts/edit/${account.id}`
+        ) Chỉnh sửa
+        a(
+            href=`${prefixAdmin}/accounts`
+            class="btn btn-warning"
+        ) Trở về
+
+        script(src="/Admin/Js/accountScript.js") 
+    else 
+        h1 Bạn không có quyền

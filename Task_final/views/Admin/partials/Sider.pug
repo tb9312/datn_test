@@ -1,0 +1,27 @@
+.sider
+    .inner-menu 
+        ul 
+            li 
+                a(href=`${prefixAdmin}/dashboard`) Dashboard
+
+            if (role.permissions.includes("articles_view"))
+                li 
+                    a(href=`${prefixAdmin}/articles`) Aticles
+
+            if (role.permissions.includes("roles_view"))
+                li 
+                    a(href=`${prefixAdmin}/roles`) Roles
+
+            if (role.permissions.includes("roles_permissions"))
+                li 
+                    a(href=`${prefixAdmin}/roles/permissions`) Permissions
+
+            if (role.permissions.includes("accounts_view"))
+                li 
+                    a(href=`${prefixAdmin}/accounts`) Accounts
+            if (role.permissions.includes("users_view"))
+                li 
+                    a(href=`${prefixAdmin}/users`) Users
+            if (role.permissions.includes("setting-general_view"))
+                li 
+                    a(href=`${prefixAdmin}/settings/general`) Setting general

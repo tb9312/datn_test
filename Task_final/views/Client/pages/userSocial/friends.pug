@@ -1,0 +1,33 @@
+extends ../../layouts/default.pug
+include ../../mixins/box-head.pug
+include ../../mixins/alert.pug
+
+block main 
+    .main
+        .container.my-3 
+            include ../../partials/list-btn-users.pug
+        .row 
+            .col-12 
+                +box-head(pageTitle)
+        .row
+            each user in users
+                .col-6(user-id=user.id)
+                    div(class="box-user add")
+                        div(class="inner-avatar")
+                            img(
+                                src=(user.avatar? user.avatar:"https://res.cloudinary.com/dyppifz1z/image/upload/v1747908416/bbt0u0sge20rhgmlmwvv.png")
+                                alt=user.fullName
+                            )
+                        div(class="inner-info")
+                            div(class="inner-name") #{user.fullName}
+                            div(class="inner-buttons")
+                                a(
+                                    href="#"
+                                    class="btn btn-sm btn-primary mr-1"
+                                ) Nhắn tin
+                        div(
+                            class="inner-status"
+                            status=user.statusOnline
+                        ) <i class="fa-solid fa-circle"></i>
+block script 
+    script(src="/Client/Js/social.js") 

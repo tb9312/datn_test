@@ -1,0 +1,59 @@
+extends ../../layouts/default.pug 
+include ../../mixins/alert.pug
+
+block main 
+    +alert-error(5000)
+    +alert-success(5000)
+    //- div #{role.permissions}
+    if(role.permissions.includes("roles_edit"))
+        h1(class="mb-4") Chỉnh sửa Nhóm quyền
+        .card.mb-4 
+            .card-header Thông tin tài khoản 
+            .card-body 
+                if(user.avatar)
+                    img(
+                        src=user.avatar 
+                        style="height: 100px; margin-bottom: 15px;"
+                    )
+                if(user.fullName)
+                    p Họ tên: <b>#{user.fullName}</b>
+                if(user.email)
+                    p Email: <b>#{user.email}</b>
+                if(user.phone)
+                    p Số điện thoại: <b>#{user.phone}</b>
+                if(role.title)
+                    p Phân quyền: <b>#{role.title}</b>
+
+        form(
+            action=`${prefixAdmin}/roles/edit/${roles.id}?_method=PATCH`
+            method="POST"
+        )
+            div(class="form-group")
+                label(for="title") Tiêu đề
+                input(
+                    type="text"
+                    class="form-control"
+                    id="title"
+                    name="title"
+                    value=roles.title
+                )
+            div(class="form-group")
+                label(for="desc") Mô tả
+                input(
+                    type="form-control textarea-mce"
+                    class="form-control"
+                    id="desc"
+                    name="description"
+                    value=roles.description
+                )
+            div(class="form-group")
+                a(
+                    href=`${prefixAdmin}/roles`
+                    class="btn btn-warning"
+                ) Tro ve
+                button(
+                    type="submit"
+                    class="btn btn-primary"
+                ) Update
+    else 
+        h1 Bạn không có quyền
