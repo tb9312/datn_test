@@ -21,10 +21,6 @@ route.post(
   uploadCloudinary.upload,
   controller.create
 );
-// route.get("/add-member/:id", controller.ListUser);
-// route.patch("/add-member/:id", controller.addMember);
-
-// route.patch("/remote-member/:id", controller.remoteMember);
 
 route.patch(
   "/edit/:id",
@@ -38,6 +34,8 @@ route.patch("/delete/:id", controller.delete);
 route.post("/comment/:id", controller.comment);
 
 route.patch("/comment/edit/:id", controller.editComment);
+
+route.patch("/comment/delete/:id", controller.deleteComment);
 
 route.patch("/priority/:id", controller.changePriority);
 

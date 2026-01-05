@@ -4,6 +4,7 @@ const PagitationHelper = require("../../../helpers/pagitation");
 const SearchHelper = require("../../../helpers/search");
 const User = require("../../../models/user.model");
 const Team = require("../../../models/team.model");
+const { updateOverdueProjetcs } = require("../../../helpers/updateOverdue");
 const mongoose = require("mongoose");
 //[GET]/api/v3/projects/:parentId/
 module.exports.getTasksByParent = async (req, res) => {
@@ -79,6 +80,7 @@ module.exports.getTasksByParent = async (req, res) => {
 
 //[GET]/api/v3/projects
 module.exports.index = async (req, res) => {
+  await updateOverdueProjetcs();
   const find = {
     $or: [
       { manager: req.user.id },
@@ -127,24 +129,54 @@ module.exports.index = async (req, res) => {
 module.exports.detail = async (req, res) => {
   try {
     const id = req.params.id;
-    const findcomment = {
-      deleted: false,
-      project_id: id,
-    };
-    const comment = await Comment.find(findcomment);
-    // console.log(comment);
+
+    // 1. Kiểm tra user có quyền xem project/task không
     const project = await Project.findOne({
       _id: id,
       deleted: false,
+      $or: [
+        { createdBy: req.user.id },
+        { listUser: req.user.id },
+        { manager: req.user.id },
+      ],
     });
+
+    if (!project) {
+      return res.status(403).json({
+        code: 403,
+        success: false,
+        message: "Bạn không có quyền xem dự án này",
+      });
+    }
+
+    // 2. Tìm comments của project/task này
+    const comments = await Comment.find({
+      project: id,
+      deleted: false,
+    })
+      .populate({
+        path: "user",
+        select: "fullName email avatar",
+      })
+      .sort({ position: 1, createdAt: 1 })
+      .lean();
+
     res.json({
       code: 200,
-      message: "success",
+      success: true,
+      message: "Lấy chi tiết dự án thành công",
       data: project,
-      comment: comment,
+      comments: comments,
+      totalComments: comments.length,
     });
   } catch (error) {
-    res.json("Khong tim thay");
+    console.error("ERROR in PROJECT DETAIL:", error);
+    res.status(500).json({
+      code: 500,
+      success: false,
+      message: "Lỗi server",
+      error: error.message,
+    });
   }
 };
 
@@ -375,36 +407,64 @@ module.exports.delete = async (req, res) => {
 //[POST]/api/v3/projects/comment/:id
 module.exports.comment = async (req, res) => {
   try {
-    const countComments = (await Comment.countDocuments()) + 1;
+    const projectId = req.params.id;
+    const userId = req.user.id;
+    const commentContent = req.body.comment || req.body.content;
+    // Check project/task
+    const project = await Project.findOne({
+      _id: projectId,
+      deleted: false,
+    });
+    if (!project) {
+      return res.status(404).json({
+        code: 404,
+        success: false,
+        message: "Không tìm thấy dự án/công việc",
+      });
+    }
+    // Check user is member
+    const isCreator = project.createdBy.toString() === userId.toString();
+    const isMember =
+      project.listUser &&
+      project.listUser.some((u) => u.toString() === userId.toString());
+    if (!isCreator && !isMember) {
+      return res.status(403).json({
+        code: 403,
+        success: false,
+        message: "Bạn không có quyền bình luận",
+      });
+    }
+
+    // Tạo comment
+    const countComments = await Comment.countDocuments();
     // console.log("req.params.id:", req.params.id);
     // console.log("req.user.id:", req.user?.id);
     // console.log("req.body:", req.body.comment);
     const newComment = new Comment({
-      project_id: req.params.id,
-      user_id: req.user.id,
-      userName: req.user.fullName,
-      comment: req.body.comment,
-      position: countComments,
+      project: projectId,
+      user: userId,
+      content: commentContent,
+      position: countComments + 1,
     });
-    const data = await newComment.save();
-    console.log(newComment);
-    if (newComment) {
-      res.json({
-        code: 200,
-        message: "success",
-        data: newComment,
-      });
-    } else {
-      res.json({
-        code: 200,
-        message: "Khong lay ra duoc du lieu",
-      });
-    }
+    const savedComment = await newComment.save();
+
+    //Tra user info len frontend
+    await savedComment.populate({
+      path: "user",
+      select: "fullName email avatar ",
+    });
+    return res.status(200).json({
+      code: 200,
+      success: true,
+      message: "Bình luận thành công",
+      data: savedComment,
+    });
   } catch (error) {
-    s;
-    res.json({
-      code: 404,
-      message: "dismiss",
+    console.error("COMMENT ERROR:", error);
+    return res.status(500).json({
+      code: 500,
+      success: false,
+      message: "Lỗi server: " + error.message,
     });
   }
 };
@@ -413,40 +473,92 @@ module.exports.comment = async (req, res) => {
 module.exports.editComment = async (req, res) => {
   try {
     // console.log(req.params.id);
-    const id = req.params.id;
+
+    const commentId = req.params.id;
+    const userId = req.user.id;
+    const newContent = req.body.comment || req.body.content;
+
     const comment = await Comment.findOne({
-      _id: id,
+      _id: commentId,
       deleted: false,
-      user_id: req.user.id,
-    });
-    if (comment) {
-      await Comment.updateOne(
-        {
-          _id: id,
-        },
-        {
-          comment: req.body.comment,
-        }
-      );
-      const data = await Comment.findOne({
-        _id: id,
-        deleted: false,
-      });
-      res.json({
-        code: 200,
-        message: "đã chỉnh sửa comment",
-        data: data,
-      });
-    } else {
-      res.json({
-        code: 400,
-        message: "Ban khong duoc sua comment cua nguoi khac",
+    }).populate("user", "_id fullName");
+    if (!comment) {
+      return res.status(404).json({
+        code: 404,
+        success: false,
+        message: "Không tìm thấy comment",
       });
     }
+    // Kiểm tra quyền chỉnh sửa
+    if (comment.user._id.toString() !== userId.toString()) {
+      return res.status(403).json({
+        code: 403,
+        success: false,
+        message: "Bạn không có quyền chỉnh sửa comment này",
+      });
+    }
+
+    // Cập nhật nội dung comment
+    comment.content = newContent;
+    const updatedComment = await comment.save();
+    return res.status(200).json({
+      code: 200,
+      success: true,
+      message: "Chỉnh sửa comment thành công",
+      data: updatedComment,
+    });
   } catch (error) {
-    res.json({
-      code: 404,
-      message: "dismiss",
+    console.error("EDIT COMMENT ERROR:", error);
+    return res.status(500).json({
+      code: 500,
+      success: false,
+      message: "Lỗi server: " + error.message,
+    });
+  }
+};
+
+//[PATCH]/api/v3/projects/comment/delete/:id
+module.exports.deleteComment = async (req, res) => {
+  try {
+    const commentId = req.params.id;
+    const userId = req.user.id;
+
+    const comment = await Comment.findOne({
+      _id: commentId,
+      deleted: false,
+    }).populate("user", "_id fullName");
+
+    if (!comment) {
+      return res.status(404).json({
+        code: 404,
+        success: false,
+        message: "Không tìm thấy comment",
+      });
+    }
+    // Kiểm tra quyền xóa
+    if (comment.user._id.toString() !== userId.toString()) {
+      return res.status(403).json({
+        code: 403,
+        success: false,
+        message: "Bạn không có quyền xóa comment này",
+      });
+    }
+    // Xoá comment
+    comment.deleted = true;
+    comment.deletedAt = new Date();
+    comment.deletedComment = await comment.save();
+    return res.status(200).json({
+      code: 200,
+      success: true,
+      message: "Xoá comment thành công",
+      data: comment.deletedComment,
+    });
+  } catch (error) {
+    console.error("DELETE COMMENT ERROR:", error);
+    return res.status(500).json({
+      code: 500,
+      success: false,
+      message: "Lỗi server: " + error.message,
     });
   }
 };

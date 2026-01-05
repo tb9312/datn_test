@@ -1,4 +1,4 @@
-const Task = require('../models/task.model');
+const Task = require('../../models/task.model');
 
 /**
  * Task Suggestion Helper - Phân tích và gợi ý tasks cho người dùng
@@ -163,9 +163,16 @@ class TaskSuggestionHelper {
         if (deadline.getTime() === today.getTime()) {
           // Deadline hôm nay
           todayTasks.push(task);
-        } else if (deadline < today && task.status !== 'Hoàn thành') {
-          // Đã quá hạn
-          overdueTasks.push(task);
+        } else if (deadline < today) {
+          // Đã quá hạn - chỉ đếm task chưa hoàn thành
+          const status = (task.status || '').toLowerCase();
+          const isCompleted = status === 'hoàn thành' || 
+                            status === 'hoan thanh' || 
+                            status === 'done' || 
+                            status === 'completed';
+          if (!isCompleted) {
+            overdueTasks.push(task);
+          }
         } else if (deadline <= threeDaysLater && deadline > today) {
           // Sắp đến deadline (trong 3 ngày)
           upcomingDeadlines.push(task);
@@ -194,7 +201,13 @@ class TaskSuggestionHelper {
       highPriorityTasks,
       inProgressTasks,
       notStartedTasks,
-      completedTasks: tasks.filter(t => t.status === 'Hoàn thành' || t.status === 'hoàn thành'),
+      completedTasks: tasks.filter(t => {
+        const status = (t.status || '').toLowerCase();
+        return status === 'hoàn thành' || 
+               status === 'hoan thanh' || 
+               status === 'done' || 
+               status === 'completed';
+      }),
       allTasks: tasks,
     };
   }
@@ -225,20 +238,25 @@ class TaskSuggestionHelper {
     const suggestions = [];
     
     // Danh sách task chưa hoàn thành (phục vụ trả lời chi tiết)
-    const incompleteTasksRaw = analysis.allTasks.filter(t => 
-      t.status !== 'Hoàn thành' && t.status !== 'hoàn thành'
-    );
+    // Lọc bỏ task có status: done, completed, hoàn thành, Hoàn thành
+    const incompleteTasksRaw = analysis.allTasks.filter(t => {
+      const status = (t.status || '').toLowerCase();
+      return status !== 'hoàn thành' && 
+             status !== 'hoan thanh' && 
+             status !== 'done' && 
+             status !== 'completed';
+    });
     const incompleteTasks = incompleteTasksRaw.map(t => this.formatTaskForDisplay(t));
 
-    // Nhắc về tasks quá hạn
-    if (analysis.overdueTasks.length > 0) {
-      suggestions.push({
-        type: 'warning',
-        title: `⚠️ Bạn có ${analysis.overdueTasks.length} task đã quá hạn!`,
-        tasks: analysis.overdueTasks.slice(0, 5).map(t => this.formatTaskForDisplay(t)),
-        message: `Có ${analysis.overdueTasks.length} task đã quá hạn và chưa hoàn thành. Bạn nên ưu tiên hoàn thành các task này.`,
-      });
-    }
+    // LOẠI BỎ: Nhắc về tasks quá hạn (không hiển thị bảng cảnh báo)
+    // if (analysis.overdueTasks.length > 0) {
+    //   suggestions.push({
+    //     type: 'warning',
+    //     title: `⚠️ Bạn có ${analysis.overdueTasks.length} task đã quá hạn!`,
+    //     tasks: analysis.overdueTasks.slice(0, 5).map(t => this.formatTaskForDisplay(t)),
+    //     message: `Có ${analysis.overdueTasks.length} task đã quá hạn và chưa hoàn thành. Bạn nên ưu tiên hoàn thành các task này.`,
+    //   });
+    // }
 
     // Nhắc về tasks hôm nay
     if (analysis.todayTasks.length > 0) {
@@ -261,18 +279,23 @@ class TaskSuggestionHelper {
     }
 
     // Nhắc về tasks ưu tiên cao
-    if (analysis.highPriorityTasks.length > 0 && analysis.highPriorityTasks.filter(t => 
-      t.status !== 'Hoàn thành' && t.status !== 'hoàn thành'
-    ).length > 0) {
-      const incompleteHighPriority = analysis.highPriorityTasks.filter(t => 
-        t.status !== 'Hoàn thành' && t.status !== 'hoàn thành'
-      );
-      suggestions.push({
-        type: 'priority',
-        title: `🔥 Bạn có ${incompleteHighPriority.length} task ưu tiên cao chưa hoàn thành`,
-        tasks: incompleteHighPriority.slice(0, 5).map(t => this.formatTaskForDisplay(t)),
-        message: `Có ${incompleteHighPriority.length} task có độ ưu tiên cao đang chưa hoàn thành.`,
+    if (analysis.highPriorityTasks.length > 0) {
+      const incompleteHighPriority = analysis.highPriorityTasks.filter(t => {
+        const status = (t.status || '').toLowerCase();
+        return status !== 'hoàn thành' && 
+               status !== 'hoan thanh' && 
+               status !== 'done' && 
+               status !== 'completed';
       });
+      
+      if (incompleteHighPriority.length > 0) {
+        suggestions.push({
+          type: 'priority',
+          title: `🔥 Bạn có ${incompleteHighPriority.length} task ưu tiên cao chưa hoàn thành`,
+          tasks: incompleteHighPriority.slice(0, 5).map(t => this.formatTaskForDisplay(t)),
+          message: `Có ${incompleteHighPriority.length} task có độ ưu tiên cao đang chưa hoàn thành.`,
+        });
+      }
     }
 
     // Tổng hợp
@@ -311,9 +334,16 @@ class TaskSuggestionHelper {
     message += `• Task quá hạn: ${analysis.overdueTasks.length}\n`;
     message += `• Task hôm nay: ${analysis.todayTasks.length}\n`;
     message += `• Task sắp đến deadline: ${analysis.upcomingDeadlines.length}\n`;
-    message += `• Task ưu tiên cao: ${analysis.highPriorityTasks.filter(t => 
-      t.status !== 'Hoàn thành' && t.status !== 'hoàn thành'
-    ).length}\n\n`;
+    
+    const incompleteHighPriorityCount = analysis.highPriorityTasks.filter(t => {
+      const status = (t.status || '').toLowerCase();
+      return status !== 'hoàn thành' && 
+             status !== 'hoan thanh' && 
+             status !== 'done' && 
+             status !== 'completed';
+    }).length;
+    
+    message += `• Task ưu tiên cao: ${incompleteHighPriorityCount}\n\n`;
 
     return {
       message,
@@ -323,9 +353,7 @@ class TaskSuggestionHelper {
         overdue: analysis.overdueTasks.length,
         today: analysis.todayTasks.length,
         upcoming: analysis.upcomingDeadlines.length,
-        highPriority: analysis.highPriorityTasks.filter(t => 
-          t.status !== 'Hoàn thành' && t.status !== 'hoàn thành'
-        ).length,
+        highPriority: incompleteHighPriorityCount,
         completed: analysis.completedTasks.length,
       },
       incompleteTasks,
@@ -412,9 +440,14 @@ class TaskSuggestionHelper {
    */
   rankTasksByPriority(analysis, limit = 10) {
     const now = new Date();
-    const incompleteTasks = (analysis.allTasks || []).filter(
-      (t) => t.status !== 'Hoàn thành' && t.status !== 'hoàn thành'
-    );
+    // Lọc task chưa hoàn thành - nghiêm ngặt hơn
+    const incompleteTasks = (analysis.allTasks || []).filter((t) => {
+      const status = (t.status || '').toLowerCase();
+      return status !== 'hoàn thành' && 
+             status !== 'hoan thanh' && 
+             status !== 'done' && 
+             status !== 'completed';
+    });
 
     // Xây index cho RAG trên dữ liệu task chưa hoàn thành
     const taskIndex = this.buildTaskIndex(incompleteTasks);
@@ -422,8 +455,8 @@ class TaskSuggestionHelper {
     const getPriorityWeight = (priority) => {
       if (!priority) return 1;
       const p = priority.toLowerCase();
-      if (p.includes('cao')) return 3;
-      if (p.includes('trung')) return 2;
+      if (p.includes('cao') || p.includes('high')) return 3;
+      if (p.includes('trung') || p.includes('medium')) return 2;
       return 1;
     };
 
@@ -442,8 +475,8 @@ class TaskSuggestionHelper {
     const getStatusWeight = (status) => {
       if (!status) return 1;
       const s = status.toLowerCase();
-      if (s.includes('đang thực hiện')) return 2;
-      if (s.includes('chưa bắt đầu') || s.includes('tồn đọng')) return 1;
+      if (s.includes('đang thực hiện') || s.includes('in-progress')) return 2;
+      if (s.includes('chưa bắt đầu') || s.includes('tồn đọng') || s.includes('backlog')) return 1;
       return 1;
     };
 
@@ -462,8 +495,10 @@ class TaskSuggestionHelper {
       const deadlineW = getDeadlineWeight(task);
       const statusW = getStatusWeight(task.status);
 
-      // Điểm rule-based cũ
-      const baseScore = priorityW * 3 + deadlineW * 2 + statusW;
+      // ƯU TIÊN: Priority trước, Deadline sau
+      // Priority weight cao hơn (x5), Deadline weight thấp hơn (x2)
+      const baseScore = priorityW * 5 + deadlineW * 2 + statusW;
+      
       // Điểm similarity RAG giữa query "ưu tiên" và task
       const similarity = this.calculateEmbeddingSimilarity(
         queryEmbedding,
@@ -471,23 +506,15 @@ class TaskSuggestionHelper {
       );
 
       // Kết hợp: ưu tiên vẫn bám logic cũ, nhưng có boost theo similarity
-      const score = baseScore + similarity * 5;
+      const score = baseScore + similarity * 3;
 
+      // Không cần reasons nữa (sẽ bỏ trong output)
       const reasons = [];
-      if (priorityW === 3) reasons.push('Ưu tiên CAO');
-      else if (priorityW === 2) reasons.push('Ưu tiên TRUNG BÌNH');
-
-      if (deadlineW === 3) reasons.push('Đã quá hạn');
-      else if (deadlineW === 2) reasons.push('Deadline hôm nay');
-      else if (deadlineW === 1) reasons.push('Sắp đến deadline (≤ 3 ngày)');
-
-      if (statusW === 2) reasons.push('Đang thực hiện');
-      else if (statusW === 1) reasons.push('Chưa bắt đầu / Tồn đọng');
 
       return {
         task: this.formatTaskForDisplay(task),
         score,
-        reasons,
+        reasons, // Giữ để không break code, nhưng sẽ không hiển thị
       };
     });
 

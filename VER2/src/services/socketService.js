@@ -1,4 +1,7 @@
-import io from 'socket.io-client';
+import io from "socket.io-client";
+
+const SOCKET_URL = "http://localhost:3370";
+const STORAGE_TOKEN_KEY = "tokenLogin";
 
 class SocketService {
   constructor() {
@@ -6,97 +9,85 @@ class SocketService {
     this.userId = null;
     this.listeners = {
       newMessage: [],
-      userOnline: [],
       typing: [],
-      connected: []
+      connected: [],
+      disconnected: [],
+      error: [],
     };
   }
 
   connect(userId) {
-    if (this.socket) {
-      this.disconnect();
-    }
+    if (this.socket) this.disconnect();
 
     this.userId = userId;
-    this.socket = io('http://localhost:3000', {
-      auth: {
-        token: localStorage.getItem('access_token')
-      },
-      transports: ['websocket', 'polling'],
-      query: {
-        userId: userId
-      }
+
+    const token =
+      localStorage.getItem(STORAGE_TOKEN_KEY) ||
+      sessionStorage.getItem(STORAGE_TOKEN_KEY);
+
+    this.socket = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+      auth: { token },          // ✅ server đọc socket.handshake.auth.token
+      query: { userId },        // optional
+      withCredentials: true,
     });
 
     this.setupListeners();
+    return this.socket;
   }
 
   setupListeners() {
-    this.socket.on('connect', () => {
-      console.log('Socket connected');
-      this.listeners.connected.forEach(callback => callback());
+    if (!this.socket) return;
+
+    this.socket.on("connect", () => {
+      console.log("✅ Socket connected:", this.socket.id);
+      this.listeners.connected.forEach((cb) => cb());
     });
 
-    this.socket.on('SERVER_RETURN_MESSAGE', (data) => {
-      this.listeners.newMessage.forEach(callback => callback(data));
+    this.socket.on("connect_error", (err) => {
+      console.error("❌ connect_error:", err.message);
+      this.listeners.error.forEach((cb) => cb(err));
     });
 
-    this.socket.on('SERVER_RETURN_TYPING', (data) => {
-      this.listeners.typing.forEach(callback => callback(data));
+    this.socket.on("disconnect", (reason) => {
+      console.log("❌ Socket disconnected:", reason);
+      this.listeners.disconnected.forEach((cb) => cb(reason));
     });
 
-    this.socket.on('USER_ONLINE', (users) => {
-      this.listeners.userOnline.forEach(callback => callback(users));
+    this.socket.on("SERVER_RETURN_MESSAGE", (data) => {
+      this.listeners.newMessage.forEach((cb) => cb(data));
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Socket disconnected');
-    });
-
-    this.socket.on('error', (error) => {
-      console.error('Socket error:', error);
+    this.socket.on("SERVER_RETURN_TYPING", (data) => {
+      this.listeners.typing.forEach((cb) => cb(data));
     });
   }
 
-  joinRoom(roomId) {
-    if (this.socket) {
-      this.socket.emit('JOIN_ROOM', { roomId });
-    }
+  joinTeam(teamId) {
+    if (!this.socket) return;
+    this.socket.emit("JOIN_ROOM", { teamId });     // ✅ match backend mới
   }
 
-  leaveRoom(roomId) {
-    if (this.socket) {
-      this.socket.emit('LEAVE_ROOM', { roomId });
-    }
+  leaveTeam(teamId) {
+    if (!this.socket) return;
+    this.socket.emit("LEAVE_ROOM", { teamId });    // ✅ match backend mới
   }
 
-  sendMessage(data) {
-    if (this.socket) {
-      this.socket.emit('CLIENT_SEND_MESSAGE', data);
-    }
+  sendMessage({ teamId, content, images = [], tempId }) {
+    if (!this.socket) return;
+    this.socket.emit("CLIENT_SEND_MESSAGE", { teamId, content, images, tempId });
   }
 
-  sendTyping(data) {
-    if (this.socket) {
-      this.socket.emit('CLIENT_SEND_TYPING', data);
-    }
+  sendTyping({ teamId, type }) {
+    if (!this.socket) return;
+    this.socket.emit("CLIENT_SEND_TYPING", { teamId, type });
   }
 
-  onNewMessage(callback) {
-    this.listeners.newMessage.push(callback);
-  }
-
-  onUserOnline(callback) {
-    this.listeners.userOnline.push(callback);
-  }
-
-  onTyping(callback) {
-    this.listeners.typing.push(callback);
-  }
-
-  onConnected(callback) {
-    this.listeners.connected.push(callback);
-  }
+  onNewMessage(cb) { this.listeners.newMessage.push(cb); }
+  onTyping(cb) { this.listeners.typing.push(cb); }
+  onConnected(cb) { this.listeners.connected.push(cb); }
+  onDisconnected(cb) { this.listeners.disconnected.push(cb); }
+  onError(cb) { this.listeners.error.push(cb); }
 
   disconnect() {
     if (this.socket) {
@@ -106,7 +97,7 @@ class SocketService {
   }
 
   isConnected() {
-    return this.socket && this.socket.connected;
+    return !!this.socket?.connected;
   }
 }
 

@@ -2,8 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { systemKnowledge, findAnswerFromKnowledge } = require('./system-knowledge');
 const taskSuggestionHelper = require('./task-suggestion.helper');
-const Calendar = require('../models/calendar.model');
-const Diary = require('../models/diary.model');
+const Diary = require('../../models/diary.model');
 
 /**
  * RAG Service - Retrieval Augmented Generation
@@ -451,7 +450,100 @@ class RAGService {
   detectIntent(query) {
     const normalized = this.normalizeQuery(query);
 
-    // Intent: User Guide / FAQ
+    // 🔴 PRIORITY 0.5: Task Context Query - HỎI THÔNG TIN TASK CỤ THỂ (ưu tiên cao nhất)
+    if (
+      (normalized.includes('task') && (
+        normalized.includes('nam trong du an nao') ||
+        normalized.includes('thuoc du an nao') ||
+        normalized.includes('du an nao') ||
+        normalized.includes('co tai lieu') ||
+        normalized.includes('tai lieu nao') ||
+        normalized.includes('file dinh kem') ||
+        normalized.includes('thong tin ve task') ||
+        normalized.includes('chi tiet task') ||
+        normalized.includes('lien quan den du an') ||
+        normalized.includes('project nao')
+      ))
+    ) {
+      return 'task_context';
+    }
+
+    // 🔴 PRIORITY 1: Personal Task - TẠO TASK (ƯTIÊN NHẤT vì cụ thể)
+    if (
+      normalized.includes('tao task') ||
+      normalized.includes('tao cong viec') ||
+      normalized.includes('them task') ||
+      normalized.includes('them cong viec') ||
+      normalized.includes('create task') ||
+      normalized.includes('add task') ||
+      normalized.includes('them nhiem vu')
+    ) {
+      return 'personal_task';
+    }
+
+    // 🔴 PRIORITY 1.5: Personal Task - CÁ NHÂN (kiểm tra "tôi", "của tôi", "mình")
+    // CHECK TRƯỚC project_stats để tránh bị nhầm
+    if (
+      (normalized.includes('toi') || normalized.includes('minh') || normalized.includes('cua toi')) &&
+      (normalized.includes('task') || normalized.includes('cong viec') || normalized.includes('viec'))
+    ) {
+      return 'personal_task';
+    }
+
+    // PRIORITY 2: Manager Analytics - CHECK TRƯỚC personal_task (dành cho MANAGER role)
+    // Phân công, gợi ý công việc - ƯTIÊN CAO vì cụ thể hơn "gợi ý" chung chung
+    if (
+      normalized.includes('goi y phan cong') ||
+      normalized.includes('phan cong') ||
+      normalized.includes('phan chia') ||
+      normalized.includes('phan bo') ||
+      normalized.includes('gan task') ||
+      normalized.includes('ai nen lam') ||
+      normalized.includes('ai co thoi gian') ||
+      normalized.includes('ai co khong') ||
+      normalized.includes('can gan') ||
+      normalized.includes('assign') ||
+      normalized.includes('distribute') ||
+      normalized.includes('suggestion')
+    ) {
+      return 'task_assignment';
+    }
+
+    // Liệt kê project members
+    if (
+      normalized.includes('ai trong team') ||
+      normalized.includes('thanh vien') ||
+      normalized.includes('co ai') ||
+      normalized.includes('project members') ||
+      normalized.includes('dung thi tham gia') ||
+      normalized.includes('project nay co') ||
+      normalized.includes('danh sach thanh vien du an') ||
+      normalized.includes('ai lam cung')
+    ) {
+      return 'team_members';
+    }
+
+    // Thống kê, tiến độ, chậm trễ DỰ ÁN (không phải cá nhân)
+    if (
+      (normalized.includes('tien do') && normalized.includes('du an')) ||
+      (normalized.includes('tien do') && normalized.includes('project')) ||
+      normalized.includes('ai cham') ||
+      normalized.includes('task cham') ||
+      (normalized.includes('hoan thanh') && normalized.includes('du an')) ||
+      (normalized.includes('hoan thanh') && normalized.includes('project')) ||
+      normalized.includes('ti le hoan thanh') ||
+      (normalized.includes('qua han') && !normalized.includes('toi')) ||
+      normalized.includes('slow') ||
+      (normalized.includes('progress') && normalized.includes('project')) ||
+      normalized.includes('delay') ||
+      (normalized.includes('overdue') && !normalized.includes('my')) ||
+      normalized.includes('thong ke du an') ||
+      normalized.includes('thong ke project')
+    ) {
+      return 'project_stats';
+    }
+
+    // PRIORITY 3: User Guide / FAQ
     if (
       normalized.includes('lam sao') ||
       normalized.includes('cach') ||
@@ -459,9 +551,6 @@ class RAGService {
       normalized.includes('the nao') ||
       normalized.includes('dang ky') ||
       normalized.includes('dang nhap') ||
-      normalized.includes('tao task') ||
-      normalized.includes('tao project') ||
-      normalized.includes('tao team') ||
       normalized.includes('xem') && (normalized.includes('task') || normalized.includes('project') || normalized.includes('calendar')) ||
       normalized.includes('tinh nang') ||
       normalized.includes('features') ||
@@ -470,7 +559,7 @@ class RAGService {
       return 'user_guide';
     }
 
-    // Intent: Personal Task / Work Management
+    // PRIORITY 4: Personal Task (OTHER patterns) - CHỈ GỢI Ý TASK CÁ NHÂN
     if (
       normalized.includes('task') ||
       normalized.includes('cong viec') ||
@@ -482,12 +571,12 @@ class RAGService {
       normalized.includes('uu tien') ||
       normalized.includes('ke hoach') ||
       normalized.includes('nhac nho') ||
-      normalized.includes('goi y')
+      (normalized.includes('goi y') && !normalized.includes('phan cong'))  // Chỉ gợi ý task cá nhân, không phải gợi ý phân công
     ) {
       return 'personal_task';
     }
 
-    // Intent: Calendar / Events
+    // PRIORITY 5: Calendar / Events
     if (
       normalized.includes('lich') ||
       normalized.includes('calendar') ||
@@ -499,19 +588,18 @@ class RAGService {
       return 'calendar';
     }
 
-    // Intent: Reports / Statistics
+    // PRIORITY 6: Reports / Statistics (báo cáo cá nhân)
     if (
       normalized.includes('bao cao') ||
       normalized.includes('thong ke') ||
       normalized.includes('reports') ||
       normalized.includes('statistics') ||
-      normalized.includes('tong quan') ||
       normalized.includes('dashboard')
     ) {
       return 'reports';
     }
 
-    // Intent: General / Overview
+    // PRIORITY 7: General / Overview
     if (
       normalized.includes('he thong') ||
       normalized.includes('system') ||
@@ -572,11 +660,11 @@ class RAGService {
         score += 20; // Boost rất cao cho overview
       }
 
-      // 1. Keyword matching với question patterns
+      // 1. Keyword matching với question patterns (HIGHEST PRIORITY)
       const matchingPatterns = doc.questionPatterns.filter(pattern =>
         normalizedQuery.includes(this.normalizeQuery(pattern))
       );
-      score += matchingPatterns.length * 5; // High weight cho exact match
+      score += matchingPatterns.length * 10; // 🔴 TĂNG: từ 5 lên 10 - ưu tiên pattern match rất cao
 
       // 2. Embedding similarity
       const embeddingSimilarity = this.calculateEmbeddingSimilarity(queryEmbedding, doc.embedding);
@@ -591,12 +679,12 @@ class RAGService {
 
       // 4. Category matching
       if (normalizedQuery.includes(doc.category)) {
-        score += 2;
+        score += 3;
       }
 
-      // 5. Penalty cho overview nếu KHÔNG phải câu hỏi về tổng quan
+      // 5. 🔴 TĂNG PENALTY cho overview nếu KHÔNG phải câu hỏi về tổng quan
       if (!isSystemOverviewQuery && (doc.id === 'overview' || doc.category === 'overview')) {
-        score *= 0.3; // Giảm điểm của overview
+        score *= 0.1; // 🔴 GIẢM: từ 0.3 xuống 0.1 - loại bỏ overview nếu không phải overview query
       }
 
       if (score > 0) {
@@ -628,6 +716,23 @@ class RAGService {
 
     const normalizedQuery = this.normalizeQuery(query);
 
+    // 🔴 PRIORITY: Tìm doc có id chứa keyword cụ thể từ query
+    // Ví dụ: query="tạo task" → ưu tiên doc có id="tasks_create"
+    const specificKeywordDocs = knowledgeDocs.filter(doc => {
+      if (normalizedQuery.includes('tao task') && doc.id.includes('task') && doc.id.includes('create')) return true;
+      if (normalizedQuery.includes('tao project') && doc.id.includes('project') && doc.id.includes('create')) return true;
+      if (normalizedQuery.includes('tao team') && doc.id.includes('team') && doc.id.includes('create')) return true;
+      if (normalizedQuery.includes('dang nhap') && doc.id.includes('login')) return true;
+      if (normalizedQuery.includes('dang ky') && doc.id.includes('register')) return true;
+      return false;
+    });
+
+    // Nếu tìm được doc chính xác, return nó ngay
+    if (specificKeywordDocs.length > 0) {
+      console.log('[RAG] Found specific keyword match:', specificKeywordDocs[0].id);
+      return specificKeywordDocs[0].answer;
+    }
+
     // Ưu tiên doc "overview" nếu hỏi về hệ thống tổng quan
     const isSystemOverviewQuery = 
       normalizedQuery.includes('he thong nay la gi') ||
@@ -644,6 +749,7 @@ class RAGService {
     
     // Nếu hỏi về tổng quan và có overview doc, ưu tiên nó
     if (isSystemOverviewQuery && overviewDoc) {
+      console.log('[RAG] Returning overview doc');
       return overviewDoc.answer;
     }
 
@@ -661,12 +767,14 @@ class RAGService {
 
     // Chọn doc có score cao nhất làm câu trả lời chính
     const mainDoc = relevantDocs[0];
+    console.log('[RAG] Returning mainDoc:', mainDoc.id, 'score:', mainDoc.score.toFixed(2));
     
     // Nếu main doc là overview và không phải câu hỏi về tổng quan, có thể cần doc khác
     if (mainDoc.id === 'overview' && !isSystemOverviewQuery && relevantDocs.length > 1) {
       // Bỏ qua overview, lấy doc tiếp theo
       const nextDoc = relevantDocs.find(doc => doc.id !== 'overview');
       if (nextDoc && nextDoc.score >= 4) {
+        console.log('[RAG] Skipping overview, returning next doc:', nextDoc.id);
         return nextDoc.answer;
       }
     }
@@ -737,11 +845,69 @@ class RAGService {
   /**
    * Generate response với RAG đầy đủ (KHÔNG dùng codebase search)
    */
-  async generateResponse(userQuery, conversationHistory = [], userId = null) {
-    // 1. Detect intent
-    const intent = this.detectIntent(userQuery);
+  async generateResponse(userQuery, conversationHistory = [], userId = null, userRole = 'USER') {
+    const normalized = this.normalizeQuery(userQuery);
+    console.log('[RAG] Query:', userQuery);
+    console.log('[RAG] Normalized:', normalized);
+    console.log('[RAG] User Role:', userRole);
 
-    // 2. Route theo intent
+    // 🔴 SPECIAL: Nếu query có "hướng dẫn" hoặc "cách" → luôn return knowledge, không dùng personal_task
+    // Ngay cả khi có "tạo task", nếu có "hướng dẫn" thì return guide, không return personal data
+    const isHowToQuery = normalized.includes('huong dan') || normalized.includes('cach') || normalized.includes('the nao');
+    console.log('[RAG] isHowToQuery:', isHowToQuery);
+    
+    if (isHowToQuery) {
+      console.log('[RAG] 🔴 Detected HOW-TO query - returning knowledge guide');
+      const knowledgeDocs = await this.retrieveKnowledge(userQuery, 5);
+      console.log('[RAG] Retrieved docs:', knowledgeDocs.map(d => ({ id: d.id, score: d.score.toFixed(2) })));
+      
+      const answer = this.generateKnowledgeAnswer(userQuery, knowledgeDocs);
+      console.log('[RAG] Answer from knowledge:', answer ? answer.substring(0, 50) + '...' : 'null');
+      
+      if (answer) {
+        return {
+          answer,
+          sources: [],
+          context: [],
+          isUserGuide: true,
+        };
+      }
+    }
+
+    // 1. Detect intent (bình thường)
+    const intent = this.detectIntent(userQuery);
+    console.log('[RAG] Intent:', intent);
+
+    // 2. PHÂN QUYỀN THEO ROLE
+    const managerIntents = ['team_members', 'project_stats', 'task_assignment'];
+    const userOnlyIntents = ['calendar', 'reports']; // Chỉ USER mới có, MANAGER không có
+
+    // Kiểm tra quyền truy cập - CHỈ chặn USER truy cập MANAGER features
+    if (managerIntents.includes(intent)) {
+      if (userRole !== 'MANAGER') {
+        console.log('[RAG] ⛔ USER attempting to access MANAGER feature');
+        return {
+          answer: '⛔ **Chức năng chỉ dành cho Quản lý (Manager)**\n\n' +
+                  'Bạn hiện đang sử dụng tài khoản **Người dùng** (User). ' +
+                  'Các chức năng quản lý dự án như xem thành viên, thống kê tiến độ, và gợi ý phân công chỉ dành cho tài khoản **Manager**.\n\n' +
+                  '💡 **Các chức năng bạn có thể sử dụng:**\n' +
+                  '• Xem task cá nhân của bạn\n' +
+                  '• Quản lý lịch và sự kiện\n' +
+                  '• Xem báo cáo công việc của bạn\n' +
+                  '• Hỏi về cách sử dụng hệ thống',
+          sources: [],
+          context: [],
+          accessDenied: true,
+          requiredRole: 'MANAGER',
+          currentRole: userRole
+        };
+      }
+    }
+    
+    // MANAGER được phép xem personal_task (vì họ cũng là thành viên có task riêng)
+    // CHỈ chặn calendar và reports nếu cần (hiện tại không chặn)
+
+    // 3. Route theo intent (sau khi đã check quyền)
     if (intent === 'user_guide' || intent === 'general') {
       // Knowledge RAG
       const knowledgeDocs = await this.retrieveKnowledge(userQuery, 5); // Lấy nhiều hơn để filter tốt hơn
@@ -753,6 +919,36 @@ class RAGService {
           sources: [], // Bỏ hẳn phần "Nguồn tham khảo"
           context: [], // Không trả về context để tránh lộ codebase
           isUserGuide: true,
+        };
+      }
+    }
+
+    // 2.5. Task Context Query - HỎI THÔNG TIN TASK CỤ THỂ
+    if (intent === 'task_context' && userId) {
+      try {
+        const taskInfo = await this.getTaskContextInfo(userQuery, userId);
+        if (taskInfo) {
+          const answer = this.generateTaskContextAnswer(taskInfo);
+          return {
+            answer,
+            sources: [],
+            context: [],
+            isTaskContext: true,
+            taskInfo
+          };
+        } else {
+          return {
+            answer: '❌ **Không tìm thấy task**\n\nTôi không tìm thấy task bạn đang hỏi. Vui lòng kiểm tra lại tên task hoặc hỏi "danh sách task của tôi" để xem tất cả các task hiện có.',
+            sources: [],
+            context: [],
+          };
+        }
+      } catch (error) {
+        console.error('[RAG] Error handling task context query:', error);
+        return {
+          answer: '❌ **Lỗi khi truy xuất thông tin task**\n\nĐã xảy ra lỗi khi tìm kiếm thông tin task. Vui lòng thử lại sau.',
+          sources: [],
+          context: [],
         };
       }
     }
@@ -791,18 +987,14 @@ class RAGService {
         let answer;
         let extraData = {};
 
-        // Xử lý daily plan (có thể là hôm nay hoặc ngày mai)
+        // Xử lý daily plan
         if (queryType === 'daily_plan') {
-          // Kiểm tra xem có phải là "ngày mai" không
-          if (normalizedQuery.includes('ngay mai')) {
-            // Xử lý kế hoạch cho ngày mai
-            answer = this.generateTomorrowPlanAnswer(userQuery, analysis, suggestionData);
-          } else {
-            // Kế hoạch hôm nay (mặc định)
-            const dailyPlan = taskSuggestionHelper.buildDailyPlan(analysis);
-            answer = this.generateDailyPlanAnswer(userQuery, suggestionData, dailyPlan);
-            extraData.dailyPlan = dailyPlan;
-          }
+          // Trích xuất số ngày từ query
+          const daysMatch = userQuery.match(/(\d+)\s*(ngày|ngay|day)/i);
+          const numDays = daysMatch ? parseInt(daysMatch[1]) : 1; // Mặc định 1 ngày (ngày mai)
+          
+          // Gọi hàm lập kế hoạch tùy chỉnh
+          answer = this.generateCustomPlanAnswer(userQuery, analysis, numDays);
         } 
         // Xử lý priority query
         else if (queryType === 'priority') {
@@ -860,7 +1052,156 @@ class RAGService {
       }
     }
 
-    // 4. Calendar RAG
+    // 🔴 NEW: MANAGER Analytics RAG (cho MANAGER role)
+    if ((intent === 'team_members' || intent === 'project_stats' || intent === 'task_assignment') && userId) {
+      try {
+        const managerAnalyticsHelper = require('./manager-analytics.helper');
+        console.log('[RAG] 🔴 MANAGER intent detected:', intent);
+
+        // Lấy dự án do manager phụ trách
+        const managerProjects = await managerAnalyticsHelper.getManagerProjects(userId);
+        console.log('[RAG] Manager projects found:', managerProjects.length);
+
+        if (managerProjects.length === 0) {
+          return {
+            answer: '📋 Bạn hiện chưa quản lý dự án nào. Hãy tạo hoặc tham gia vào một dự án để xem thông tin quản lý.',
+            sources: [],
+            context: [],
+            isManagerAnalytics: true,
+          };
+        }
+
+        let answer = '';
+        const managerData = {};
+
+        // Helper: Tìm dự án dựa trên tên trong query
+        const findProjectByName = (query, projects) => {
+          const normalized = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          
+          for (const project of projects) {
+            const projectNameNormalized = project.title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            // Kiểm tra nếu tên dự án xuất hiện trong query
+            if (normalized.includes(projectNameNormalized)) {
+              console.log('[DEBUG] Found project match:', project.title);
+              return project;
+            }
+          }
+          
+          // Không tìm thấy dự án nào khớp
+          return null;
+        };
+
+        // Tìm dự án focus dựa trên query
+        const focusProject = findProjectByName(userQuery, managerProjects);
+
+        // Nếu không tìm thấy dự án nào khớp, yêu cầu người dùng chỉ rõ
+        if (!focusProject) {
+          console.log('[RAG] No project name found in query - requesting clarification');
+          
+          let projectList = '';
+          managerProjects.forEach((project, idx) => {
+            projectList += `${idx + 1}. **${project.title}**\n`;
+          });
+
+          return {
+            answer: `📋 **Vui lòng chỉ rõ tên dự án**\n\n` +
+                    `Bạn đang quản lý **${managerProjects.length} dự án**. Vui lòng nêu rõ tên dự án trong câu hỏi để tôi có thể trả lời chính xác.\n\n` +
+                    `**Danh sách dự án của bạn:**\n${projectList}\n` +
+                    `💡 **Ví dụ câu hỏi:**\n` +
+                    `• "Thành viên dự án **${managerProjects[0].title}**"\n` +
+                    `• "Tiến độ dự án **${managerProjects[0].title}**"\n` +
+                    `• "Gợi ý phân công cho dự án **${managerProjects[0].title}**"`,
+            sources: [],
+            context: [],
+            isManagerAnalytics: true,
+            requiresProjectName: true,
+            managerProjects: managerProjects.map(p => ({ id: p._id, title: p.title }))
+          };
+        }
+
+        // TEAM_MEMBERS intent: Liệt kê thành viên trong dự án
+        if (intent === 'team_members') {
+          console.log('[RAG] Retrieving team members...');
+          console.log('[RAG] Focus project:', focusProject.title);
+          
+          const members = await managerAnalyticsHelper.getProjectMembers(focusProject._id);
+          
+          managerData.projectName = focusProject.title;
+          managerData.members = members;
+          answer = managerAnalyticsHelper.formatProjectMembers(members);
+          answer = `**Dự án: ${focusProject.title}**\n\n` + answer;
+        }
+        // PROJECT_STATS intent: Thống kê hoàn thành & chậm trễ
+        else if (intent === 'project_stats') {
+          console.log('[RAG] Calculating project statistics...');
+          console.log('[RAG] Focus project:', focusProject.title);
+          
+          const stats = await managerAnalyticsHelper.getProjectStats(focusProject._id);
+          const memberPerformance = await managerAnalyticsHelper.getMemberPerformance(focusProject._id);
+          const overdueTasks = await managerAnalyticsHelper.getOverdueTasks(focusProject._id);
+
+          managerData.projectName = focusProject.title;
+          managerData.stats = stats;
+          managerData.memberPerformance = memberPerformance;
+          managerData.overdueTasks = overdueTasks;
+
+          answer = managerAnalyticsHelper.formatProjectStats(stats, focusProject.title);
+          
+          if (memberPerformance.length > 0) {
+            answer += '\n\n' + managerAnalyticsHelper.formatMemberPerformance(memberPerformance);
+          }
+          
+          if (overdueTasks.length > 0) {
+            answer += '\n\n' + managerAnalyticsHelper.formatOverdueTasks(overdueTasks);
+          }
+        }
+        // TASK_ASSIGNMENT intent: Gợi ý phân công
+        else if (intent === 'task_assignment') {
+          console.log('[RAG] Generating task assignment suggestions...');
+          console.log('[RAG] Focus project:', focusProject.title);
+          
+          const suggestions = await managerAnalyticsHelper.suggestTaskAssignment(focusProject._id, 5);
+          const memberPerformance = await managerAnalyticsHelper.getMemberPerformance(focusProject._id);
+
+          managerData.projectName = focusProject.title;
+          managerData.suggestions = suggestions;
+          managerData.memberPerformance = memberPerformance;
+
+          if (suggestions.length > 0) {
+            answer = managerAnalyticsHelper.formatAssignmentSuggestions(suggestions);
+          } else {
+            answer = '✅ Tất cả tasks đã được phân công hoặc dự án không có tasks pending.';
+          }
+
+          if (memberPerformance.length > 0) {
+            answer += '\n\n**📊 Hiệu suất thành viên (dùng để tham khảo khi phân công):**\n\n';
+            answer += managerAnalyticsHelper.formatMemberPerformance(memberPerformance);
+          }
+
+          answer = `**Dự án: ${focusProject.title}**\n\n` + answer;
+        }
+
+        return {
+          answer,
+          sources: [],
+          context: [],
+          isManagerAnalytics: true,
+          managerIntent: intent,
+          managerData: managerData,
+        };
+      } catch (error) {
+        console.error('[RAG] Error in MANAGER analytics:', error);
+        return {
+          answer: '⚠️ Có lỗi khi lấy dữ liệu quản lý. Vui lòng thử lại sau.',
+          sources: [],
+          context: [],
+          isManagerAnalytics: true,
+          error: error.message,
+        };
+      }
+    }
+
+    // 5. Calendar RAG
     if (intent === 'calendar' && userId) {
       try {
         const personalData = await this.retrievePersonalData(userId, userQuery);
@@ -901,7 +1242,7 @@ class RAGService {
       }
     }
 
-    // 5. Reports intent (có thể mở rộng sau)
+    // 6. Reports intent (có thể mở rộng sau)
     if (intent === 'reports' && userId) {
       try {
         const analysis = await taskSuggestionHelper.analyzeTasks(userId);
@@ -932,7 +1273,7 @@ class RAGService {
       }
     }
 
-    // 6. Fallback: thử Knowledge RAG một lần nữa với query gốc
+    // 7. Fallback: thử Knowledge RAG một lần nữa với query gốc
     const knowledgeDocs = await this.retrieveKnowledge(userQuery, 5);
     const fallbackAnswer = this.generateKnowledgeAnswer(userQuery, knowledgeDocs);
     
@@ -945,7 +1286,7 @@ class RAGService {
       };
     }
 
-    // 7. Final fallback
+    // 8. Final fallback
     const fallback =
       "Xin lỗi, tôi chưa hiểu rõ câu hỏi của bạn. Tôi có thể giúp bạn:\n\n" +
       "📖 **Hướng dẫn sử dụng hệ thống**\n" +
@@ -1327,12 +1668,11 @@ class RAGService {
 
     const normalized = normalizeText(query);
 
-    // Nhận diện câu hỏi lập kế hoạch (hôm nay hoặc ngày mai)
+    // Nhận diện câu hỏi lập kế hoạch với số ngày cụ thể
+    // Ví dụ: "lập kế hoạch 3 ngày", "kế hoạch cho 5 ngày tới", "10 ngày"
     if (
       normalized.includes('lap ke hoach') ||
       normalized.includes('ke hoach') ||
-      (normalized.includes('hom nay') && normalized.includes('nen lam gi truoc')) ||
-      (normalized.includes('ngay mai') && normalized.includes('nen lam gi')) ||
       normalized.includes('plan')
     ) {
       return 'daily_plan';
@@ -1346,9 +1686,8 @@ class RAGService {
       normalized.includes('viec nao uu tien') ||
       normalized.includes('task nao quan trong') ||
       normalized.includes('task quan trong nhat') ||
-      // Các biến thể linh hoạt hơn
-      (normalized.includes('goi y') && normalized.includes('uu tien')) ||
-      normalized.includes('nen uu tien')
+      normalized.includes('nen uu tien') ||
+      (normalized.includes('goi y') && normalized.includes('uu tien'))
     ) {
       return 'priority';
     }
@@ -1517,6 +1856,362 @@ class RAGService {
 
   /**
    * Tạo kế hoạch cho ngày mai
+   */
+  /**
+   * Tạo kế hoạch tùy chỉnh cho N ngày tới (sắp xếp theo priority trước, deadline sau)
+   */
+  generateCustomPlanAnswer(query, analysis, numDays = 1) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + numDays);
+
+    // Lọc task chưa hoàn thành trong khoảng thời gian
+    const relevantTasks = analysis.allTasks.filter(task => {
+      const status = (task.status || '').toLowerCase();
+      const isCompleted = status === 'hoàn thành' || 
+                        status === 'hoan thanh' || 
+                        status === 'done' || 
+                        status === 'completed';
+      if (isCompleted) return false;
+      
+      // Lấy tất cả task chưa hoàn thành (không chỉ deadline trong N ngày)
+      return true;
+    });
+
+    if (relevantTasks.length === 0) {
+      const dateRange = numDays === 1 ? 'ngày mai' : `${numDays} ngày tới`;
+      return `📅 **Kế hoạch cho ${dateRange}:**\n\nBạn không có task nào cần làm. Bạn có thể tạo task mới hoặc nghỉ ngơi! 😊`;
+    }
+
+    // Sắp xếp theo PRIORITY TRƯỚC, DEADLINE SAU
+    const sortedTasks = relevantTasks.sort((a, b) => {
+      // 1. Priority weight
+      const getPriorityValue = (priority) => {
+        if (!priority) return 1;
+        const p = (priority || '').toLowerCase();
+        if (p.includes('cao') || p.includes('high')) return 3;
+        if (p.includes('trung') || p.includes('medium')) return 2;
+        return 1;
+      };
+
+      // 2. Deadline weight
+      const getDeadlineValue = (task) => {
+        if (!task.timeFinish) return 999; // Không deadline -> xếp sau
+        const deadline = new Date(task.timeFinish);
+        const diffDays = Math.floor((deadline - now) / (24 * 60 * 60 * 1000));
+        return diffDays; // Càng gần deadline càng nhỏ -> ưu tiên cao hơn
+      };
+
+      const aPriority = getPriorityValue(a.priority);
+      const bPriority = getPriorityValue(b.priority);
+      
+      // So sánh priority trước
+      if (aPriority !== bPriority) {
+        return bPriority - aPriority; // Priority cao lên trước
+      }
+      
+      // Nếu priority bằng nhau, so sánh deadline
+      return getDeadlineValue(a) - getDeadlineValue(b); // Deadline gần lên trước
+    });
+
+    // Tạo lịch làm việc với time slots cụ thể (không chồng chéo)
+    // Mỗi task 6 tiếng, nghỉ 1 tiếng giữa các task
+    const workHours = [
+      { start: 8, end: 14 },   // 8:00-14:00 (6 tiếng)
+      { start: 15, end: 21 }   // 15:00-21:00 (6 tiếng, nghỉ 1 tiếng từ 14:00-15:00)
+    ];
+
+    const schedule = [];
+    let currentDay = 0;
+    let slotIndex = 0;
+
+    // Phân bổ tasks vào các time slots
+    sortedTasks.forEach((task) => {
+      if (currentDay >= numDays) return; // Đã hết số ngày quy hoạch
+
+      const workDate = new Date(today);
+      workDate.setDate(workDate.getDate() + currentDay + 1); // +1 để bắt đầu từ ngày mai
+
+      const slot = workHours[slotIndex];
+      const formatted = taskSuggestionHelper.formatTaskForDisplay(task);
+
+      schedule.push({
+        date: workDate,
+        startHour: slot.start,
+        endHour: slot.end,
+        task: formatted,
+        taskRaw: task
+      });
+
+      // Chuyển sang slot tiếp theo
+      slotIndex++;
+      if (slotIndex >= workHours.length) {
+        slotIndex = 0;
+        currentDay++;
+      }
+    });
+
+    // Tạo câu trả lời với lịch chi tiết
+    const dateRange = numDays === 1 
+      ? `ngày mai (${new Date(today.getTime() + 24*60*60*1000).toLocaleDateString('vi-VN')})` 
+      : `${numDays} ngày tới`;
+    
+    let answer = `📅 **Kế hoạch làm việc chi tiết cho ${dateRange}:**\n\n`;
+
+    let currentDisplayDay = null;
+    schedule.forEach((item, idx) => {
+      const dayStr = item.date.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      
+      // Hiển thị header ngày nếu là ngày mới
+      if (currentDisplayDay !== dayStr) {
+        if (currentDisplayDay !== null) answer += '\n';
+        answer += `**${dayStr}:**\n`;
+        currentDisplayDay = dayStr;
+      }
+
+      const timeSlot = `${item.startHour.toString().padStart(2, '0')}:00 - ${item.endHour.toString().padStart(2, '0')}:00`;
+      answer += `⏰ ${timeSlot}: **${item.task.title}**\n`;
+      answer += `   • Độ ưu tiên: ${item.task.priority}\n`;
+      answer += `   • Deadline: ${item.task.deadline}\n`;
+      if (item.task.content) {
+        answer += `   • Mô tả: ${item.task.content.substring(0, 50)}${item.task.content.length > 50 ? '...' : ''}\n`;
+      }
+      answer += '\n';
+    });
+
+    if (sortedTasks.length > schedule.length) {
+      answer += `\n📌 *Còn ${sortedTasks.length - schedule.length} task khác chưa được xếp lịch. Hãy hoàn thành các task trên trước để có thể tiếp tục.*`;
+    }
+
+    return answer;
+  }
+
+  /**
+   * Lấy thông tin context của task (project, files, links)
+   * CHỈ lấy task từ các dự án nhóm mà user tham gia (không phải công việc cá nhân)
+   */
+  async getTaskContextInfo(query, userId) {
+    const Project = require('../../models/project.model');
+    
+    // Trích xuất tên task từ query
+    const taskName = this.extractTaskNameFromQuery(query);
+    if (!taskName) return null;
+
+    console.log('[RAG] Searching for task:', taskName);
+
+    try {
+      // Convert userId to string vì listUser là Array of Strings
+      const userIdStr = userId.toString ? userId.toString() : userId;
+      
+      // Bước 1: Tìm tất cả các dự án nhóm mà user tham gia
+      const userProjects = await Project.find({
+        projectParentId: { $exists: false }, // Đây là project (không phải task)
+        deleted: false,
+        listUser: userIdStr // User là thành viên của project
+      }).select('_id title content').lean();
+      
+      console.log('[RAG] Searching for projects with userId:', userIdStr);
+
+      if (userProjects.length === 0) {
+        console.log('[RAG] User is not a member of any team project');
+        return null;
+      }
+
+      const projectIds = userProjects.map(p => p._id.toString());
+      console.log('[RAG] User is member of projects:', projectIds);
+
+      // Bước 2: Tìm tasks thuộc các dự án này
+      const tasks = await Project.find({
+        projectParentId: { $in: projectIds }, // Task thuộc một trong các projects
+        deleted: false
+      }).lean();
+
+      console.log('[RAG] Found', tasks.length, 'tasks in user\'s projects');
+
+      // Bước 3: Tìm task khớp với tên (fuzzy match)
+      const searchName = taskName.toLowerCase();
+      const matchedTask = tasks.find(task => {
+        const taskTitle = (task.title || '').toLowerCase();
+        
+        // Normalize Vietnamese characters for better matching
+        const normalizeVietnamese = (str) => {
+          return str
+            .replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, 'a')
+            .replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, 'e')
+            .replace(/ì|í|ị|ỉ|ĩ/g, 'i')
+            .replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, 'o')
+            .replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, 'u')
+            .replace(/ỳ|ý|ỵ|ỷ|ỹ/g, 'y')
+            .replace(/đ/g, 'd');
+        };
+        
+        const normalizedTitle = normalizeVietnamese(taskTitle);
+        const normalizedSearch = normalizeVietnamese(searchName);
+        
+        const matches = taskTitle.includes(searchName) || 
+                       searchName.includes(taskTitle) ||
+                       normalizedTitle.includes(normalizedSearch) ||
+                       normalizedSearch.includes(normalizedTitle);
+        
+        if (matches) {
+          console.log('[RAG] Found matching task:', task.title);
+        }
+        
+        return matches;
+      });
+
+      if (!matchedTask) {
+        console.log('[RAG] No task matched the search term:', taskName);
+        console.log('[RAG] Available tasks:', tasks.map(t => t.title).join(', '));
+        return null;
+      }
+
+      // Bước 4: Lấy thông tin project chứa task
+      const project = userProjects.find(p => p._id.toString() === matchedTask.projectParentId);
+
+      // Bước 5: Lấy thông tin người tạo task
+      const User = require('../../models/user.model');
+      let creatorInfo = null;
+      if (matchedTask.createdBy) {
+        const creator = await User.findById(matchedTask.createdBy).select('fullName email').lean();
+        if (creator) {
+          creatorInfo = {
+            name: creator.fullName,
+            email: creator.email
+          };
+        }
+      }
+
+      return {
+        task: matchedTask,
+        project: project,
+        creator: creatorInfo
+      };
+    } catch (error) {
+      console.error('[RAG] Error in getTaskContextInfo:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Trích xuất tên task từ query
+   */
+  extractTaskNameFromQuery(query) {
+    const normalized = query.toLowerCase();
+    
+    // Patterns: "task A nằm trong...", "công việc Y thuộc...", "nhiệm vụ Z có..."
+    const patterns = [
+      // Pattern 1: "task [tên] nằm trong..."
+      /task\s+(.+?)\s+(?:nam trong|thuoc|co tai lieu|co file|lien quan den|trong du an|du an nao|project nao)/i,
+      // Pattern 2: "công việc [tên] nằm trong..."
+      /cong viec\s+(.+?)\s+(?:nam trong|thuoc|co tai lieu|co file|lien quan den|trong du an|du an nao)/i,
+      // Pattern 3: "nhiệm vụ [tên] nằm trong..."
+      /nhiem vu\s+(.+?)\s+(?:nam trong|thuoc|co tai lieu|co file|lien quan den|trong du an|du an nao)/i,
+      // Pattern 4: Fallback - lấy text sau "task" đến hết
+      /task\s+(.+)$/i,
+      /cong viec\s+(.+)$/i,
+      /nhiem vu\s+(.+)$/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = query.match(pattern);
+      if (match && match[1]) {
+        let extracted = match[1].trim();
+        // Loại bỏ các từ khóa cuối câu không cần thiết (nếu vẫn còn)
+        extracted = extracted.replace(/\s+(nay|nao|nay|thuoc|nam trong|nam|co|trong|lien quan|du an nao|project nao|tai lieu|file).*$/i, '').trim();
+        
+        console.log('[RAG] Extracted task name:', extracted);
+        return extracted;
+      }
+    }
+
+    console.log('[RAG] Could not extract task name from query');
+    return null;
+  }
+
+  /**
+   * Generate câu trả lời về task context
+   */
+  generateTaskContextAnswer(taskInfo) {
+    const { task, project, creator } = taskInfo;
+    
+    let answer = `📌 **Thông tin về task: ${task.title}**\n\n`;
+
+    // Thông tin dự án
+    if (project) {
+      answer += `🗂️ **Dự án**: ${project.title}\n`;
+      if (project.content) {
+        const description = project.content.length > 200 
+          ? project.content.substring(0, 200) + '...' 
+          : project.content;
+        answer += `   📝 Mô tả dự án: ${description}\n`;
+      }
+      answer += `\n`;
+    } else {
+      answer += `🗂️ **Dự án**: Không xác định (có thể là task độc lập)\n\n`;
+    }
+
+    // Thông tin task
+    answer += `📋 **Chi tiết task:**\n`;
+    
+    if (task.content) {
+      answer += `   • Mô tả: ${task.content}\n`;
+    }
+    
+    if (task.status) {
+      answer += `   • Trạng thái: ${task.status}\n`;
+    }
+    
+    if (task.priority) {
+      const priorityMap = {
+        'high': '🔴 Cao',
+        'cao': '🔴 Cao',
+        'medium': '🟡 Trung bình',
+        'trung binh': '🟡 Trung bình',
+        'low': '🟢 Thấp',
+        'thap': '🟢 Thấp'
+      };
+      const priorityText = priorityMap[task.priority.toLowerCase()] || task.priority;
+      answer += `   • Độ ưu tiên: ${priorityText}\n`;
+    }
+    
+    if (task.timeStart) {
+      answer += `   • Ngày bắt đầu: ${new Date(task.timeStart).toLocaleDateString('vi-VN')}\n`;
+    }
+    
+    if (task.timeFinish) {
+      answer += `   • Deadline: ${new Date(task.timeFinish).toLocaleDateString('vi-VN')}\n`;
+    }
+
+    if (task.tags && task.tags.length > 0) {
+      answer += `   • Tags: ${task.tags.join(', ')}\n`;
+    }
+    
+    answer += `\n`;
+
+    // Thông tin người tạo
+    if (creator) {
+      answer += `👤 **Người giao việc**: ${creator.name}\n`;
+      if (creator.email) {
+        answer += `   📧 Email: ${creator.email}\n`;
+      }
+      answer += `\n`;
+    }
+
+    // Thông tin file đính kèm (nếu có)
+    if (task.thumbnail) {
+      answer += `📎 **File đính kèm:**\n`;
+      answer += `   • [Xem file](${task.thumbnail})\n\n`;
+    }
+
+    answer += `💡 **Gợi ý**: Bạn có thể hỏi thêm về các task khác hoặc yêu cầu lập kế hoạch làm việc!`;
+
+    return answer;
+  }
+
+  /**
+   * [DEPRECATED] Tạo kế hoạch cho ngày mai - Dùng generateCustomPlanAnswer thay thế
    */
   generateTomorrowPlanAnswer(query, analysis, suggestionData) {
     const now = new Date();
@@ -1693,9 +2388,7 @@ class RAGService {
       answer += `   - Trạng thái: ${task.status}\n`;
       answer += `   - Độ ưu tiên: ${task.priority}\n`;
       answer += `   - Deadline: ${task.deadline}\n`;
-      if (item.reasons && item.reasons.length > 0) {
-        answer += `   - Lý do: ${item.reasons.join(', ')}\n`;
-      }
+      // BỎ: Dòng "Lý do"
       if (task.content) {
         answer += `   - Mô tả: ${task.content.substring(0, 80)}${
           task.content.length > 80 ? '...' : ''

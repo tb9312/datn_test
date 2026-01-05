@@ -1,26 +1,38 @@
+const jwt = require("jsonwebtoken");
 const User = require("../../../models/user.model");
+
 module.exports.requireAuth = async (req, res, next) => {
-  if (req.headers.authorization) {
-    const token = req.headers.authorization.split(" ")[1];
-    // console.log(token);
-    const user = await User.findOne({
-      token: token,
-      deleted: false,
-      role: "MANAGER",
-    }).select("-password -token");
+  try {
+    const authHeader = req.headers.authorization || "";
+    let token = null;
+    if (authHeader.startsWith("Bearer ")) {
+      token = authHeader.slice(7).trim();
+      console.log("token", token);
+    }
+    if (!token) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required" });
+    }
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET); // nhớ set JWT_SECRET
+    } catch (e) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid or expired token" });
+    }
+    const user = await User.findById(decoded.id).select("-password");
     if (!user) {
-      res.json({
-        code: 400,
-        message: "Tai khoan khong hop le!!",
-      });
-      return;
+      return res
+        .status(401)
+        .json({ success: false, message: "User not found" });
     }
     req.user = user;
-    next();
-  } else {
-    res.json({
-      code: 400,
-      mesage: "Vui long gui kem token",
-    });
+    req.auth = decoded;
+    return next();
+  } catch (error) {
+    console.error("Auth error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };

@@ -8,20 +8,20 @@ import {
   Select,
   Row,
   Col,
-  Tabs,
   Card,
   Empty,
   Typography,
   Statistic,
-  Drawer
+  Drawer,
+  Tag,
+  Spin
 } from 'antd';
 import {
   PlusOutlined,
   SearchOutlined,
   TeamOutlined,
   UserOutlined,
-  AppstoreOutlined,
-  UnorderedListOutlined
+  ReloadOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import TeamCard from '../../components/Teams/TeamCard';
@@ -29,6 +29,8 @@ import TeamForm from '../../components/Teams/TeamForm';
 import TeamChat from '../../components/Chat/TeamChat';
 import { useAuth } from '../../contexts/AuthContext';
 import PermissionWrapper from '../../components/Common/PermissionWrapper';
+import { teamService } from '../../services/teamService';
+import userService from '../../services/userService';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -42,99 +44,87 @@ const Teams = () => {
   const [editingTeam, setEditingTeam] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [viewMode, setViewMode] = useState('grid');
-  const [activeTab, setActiveTab] = useState('all');
   const [chatDrawerVisible, setChatDrawerVisible] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1
+  });
 
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-
-  const users = [
-    { id: 1, name: 'Nguyễn Văn A', email: 'a@example.com', avatar: null, isOnline: true },
-    { id: 2, name: 'Trần Thị B', email: 'b@example.com', avatar: null, isOnline: true },
-    { id: 3, name: 'Lê Văn C', email: 'c@example.com', avatar: null, isOnline: false },
-    { id: 4, name: 'Phạm Thị D', email: 'd@example.com', avatar: null, isOnline: true },
-    { id: 5, name: 'Hoàng Văn E', email: 'e@example.com', avatar: null, isOnline: false }
-  ];
 
   useEffect(() => {
     loadTeams();
-  }, []);
+    loadUsers();
+    loadProjects();
+  }, [pagination.page, filterStatus]);
 
   useEffect(() => {
     filterTeams();
-  }, [teams, searchText, filterStatus, activeTab]);
+  }, [teams, searchText]);
 
-  const loadTeams = () => {
+  const loadTeams = async () => {
     setLoading(true);
-    const mockTeams = [
-      {
-        id: 1,
-        name: 'Division 1',
-        description: 'Nhóm phát triển ứng dụng web',
-        isPrivate: false,
-        isActive: true,
-        members: [
-          { ...users[0], isLeader: true },
-          { ...users[1], isLeader: false },
-          { ...users[2], isLeader: false }
-        ],
-        memberCount: 3,
-        projectCount: 5,
-        totalTasks: 45,
-        completedTasks: 32,
-        tags: ['frontend', 'react', 'vue', 'javascript'],
-        recentActivity: 'Hoàn thành component library',
-        createdAt: '2024-01-01'
-      },
-      {
-        id: 2,
-        name: 'Division 2',
-        description: 'Nhóm phát triển mobile app',
-        isPrivate: false,
-        isActive: true,
-        members: [
-          { ...users[2], isLeader: true },
-          { ...users[3], isLeader: false }
-        ],
-        memberCount: 2,
-        projectCount: 3,
-        totalTasks: 28,
-        completedTasks: 18,
-        tags: ['backend', 'nodejs', 'python', 'database'],
-        recentActivity: 'Deploy API version 2.0',
-        createdAt: '2024-01-05'
-      },
-      {
-        id: 3,
-        name: 'Division 3',
-        description: 'Nhóm phát triển ứng dụng IOT',
-        isPrivate: true,
-        isActive: true,
-        members: [
-          { ...users[1], isLeader: true },
-          { ...users[4], isLeader: false }
-        ],
-        memberCount: 2,
-        projectCount: 4,
-        totalTasks: 22,
-        completedTasks: 15,
-        tags: ['design', 'ui/ux', 'figma', 'prototype'],
-        recentActivity: 'Thiết kế wireframe mới',
-        createdAt: '2024-01-10'
+    try {
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(filterStatus !== 'all' && { isActive: filterStatus === 'active' })
+      };
+
+      const response = await teamService.getTeams(params);
+      
+      if (response.code === 200) {
+        setTeams(response.data);
+        setPagination(response.pagination || {
+          total: response.data.length,
+          page: 1,
+          limit: 10,
+          totalPages: 1
+        });
       }
-    ];
-    setTeams(mockTeams);
-    setLoading(false);
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách nhóm: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getVisibleTeams = (allTeams) => {
-    if (!user) return [];
-    if (user.role === 'manager') return allTeams; // admin thấy tất cả
-    return allTeams.filter(
-      team => !team.isPrivate || team.members.some(m => m.id === user.id)
-    );
+  const loadUsers = async () => {
+    try {
+      const response = await userService.getUsers({
+        page: 1,
+        limit: 100
+      });
+      
+      if (response.success) {
+        setUsers(response.data.map(u => ({
+          id: u._id,
+          name: u.fullName,
+          email: u.email,
+          avatar: u.avatar
+        })));
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách user:', error);
+    }
+  };
+
+  const loadProjects = async () => {
+    try {
+      // Load projects mà user có quyền tạo team
+      const response = await teamService.getProjectsForTeam();
+      if (response.code === 200) {
+        setProjects(response.data);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách dự án:', error);
+    }
   };
 
   const filterTeams = () => {
@@ -143,84 +133,89 @@ const Teams = () => {
     if (searchText) {
       filtered = filtered.filter(team =>
         team.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        team.description.toLowerCase().includes(searchText.toLowerCase()) ||
-        (team.tags && team.tags.some(tag => tag.toLowerCase().includes(searchText.toLowerCase())))
+        (team.description && team.description.toLowerCase().includes(searchText.toLowerCase()))
       );
     }
 
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(team =>
-        filterStatus === 'active' ? team.isActive : !team.isActive
-      );
-    }
-
-    if (activeTab !== 'all') {
-      if (activeTab === 'active') filtered = filtered.filter(team => team.isActive);
-      else if (activeTab === 'private') filtered = filtered.filter(team => team.isPrivate);
-      else if (activeTab === 'inactive') filtered = filtered.filter(team => !team.isActive);
-    }
-
-    const visibleTeams = getVisibleTeams(filtered);
-    setFilteredTeams(visibleTeams);
+    setFilteredTeams(filtered);
   };
 
-  const handleCreateTeam = (values) => {
-    if (!hasPermission('create_team')) {
-      message.error('Bạn không có quyền tạo nhóm!');
-      return;
+  const handleCreateTeam = async (values) => {
+    try {
+      const response = await teamService.createTeam(values);
+      
+      if (response.code === 200) {
+        message.success('Tạo nhóm thành công!');
+        setModalVisible(false);
+        loadTeams(); // Reload danh sách
+      } else {
+        message.error(response.message || 'Lỗi khi tạo nhóm');
+      }
+    } catch (error) {
+      message.error('Lỗi khi tạo nhóm: ' + error.message);
     }
-    const newTeam = {
-      id: Date.now(),
-      ...values,
-      memberCount: values.members?.length || 0,
-      projectCount: 0,
-      totalTasks: 0,
-      completedTasks: 0,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setTeams(prev => [newTeam, ...prev]);
-    message.success('Tạo nhóm thành công!');
-    setModalVisible(false);
   };
 
-  const handleUpdateTeam = (values) => {
-    if (!hasPermission('edit_team')) {
-      message.error('Bạn không có quyền chỉnh sửa nhóm!');
-      return;
+  const handleUpdateTeam = async (values) => {
+    try {
+      if (!editingTeam) return;
+      
+      const response = await teamService.updateTeam(editingTeam._id, values);
+      
+      if (response.code === 200) {
+        message.success('Cập nhật nhóm thành công!');
+        setModalVisible(false);
+        setEditingTeam(null);
+        loadTeams(); // Reload danh sách
+      } else {
+        message.error(response.message || 'Lỗi khi cập nhật nhóm');
+      }
+    } catch (error) {
+      message.error('Lỗi khi cập nhật nhóm: ' + error.message);
     }
-    setTeams(prev =>
-      prev.map(team =>
-        team.id === editingTeam.id
-          ? { ...team, ...values, memberCount: values.members?.length || 0 }
-          : team
-      )
-    );
-    message.success('Cập nhật nhóm thành công!');
-    setModalVisible(false);
-    setEditingTeam(null);
   };
 
-  const handleDeleteTeam = (teamId) => {
-    if (!hasPermission('delete_team')) {
-      message.error('Bạn không có quyền xóa nhóm!');
-      return;
-    }
+  const handleDeleteTeam = async (teamId) => {
     Modal.confirm({
       title: 'Xác nhận xóa',
-      content: 'Bạn có chắc chắn muốn xóa nhóm này? Tất cả dữ liệu liên quan sẽ bị mất.',
+      content: 'Bạn có chắc chắn muốn xóa nhóm này?',
       okText: 'Xóa',
       cancelText: 'Hủy',
       okType: 'danger',
-      onOk: () => {
-        setTeams(prev => prev.filter(team => team.id !== teamId));
-        message.success('Xóa nhóm thành công!');
+      onOk: async () => {
+        try {
+          const response = await teamService.deleteTeam(teamId);
+          
+          if (response.code === 200) {
+            message.success('Xóa nhóm thành công!');
+            loadTeams(); // Reload danh sách
+          } else {
+            message.error(response.message || 'Lỗi khi xóa nhóm');
+          }
+        } catch (error) {
+          message.error('Lỗi khi xóa nhóm: ' + error.message);
+        }
       }
     });
   };
 
+  const handleToggleActive = async (teamId, isActive) => {
+    try {
+      const response = await teamService.toggleActive(teamId, isActive);
+      
+      if (response.code === 200) {
+        message.success(`Đã ${isActive ? 'kích hoạt' : 'tạm dừng'} nhóm thành công!`);
+        loadTeams(); // Reload danh sách
+      } else {
+        message.error(response.message || 'Lỗi khi cập nhật trạng thái');
+      }
+    } catch (error) {
+      message.error('Lỗi khi cập nhật trạng thái: ' + error.message);
+    }
+  };
+
   const handleViewTeam = (team) => {
-    navigate(`/teams/${team.id}`);
-    message.info(`Xem chi tiết nhóm: ${team.name}`);
+    navigate(`/teams/${team._id}`);
   };
 
   const handleEditTeam = (team) => {
@@ -234,8 +229,11 @@ const Teams = () => {
   };
 
   const handleFormFinish = (values) => {
-    if (editingTeam) handleUpdateTeam(values);
-    else handleCreateTeam(values);
+    if (editingTeam) {
+      handleUpdateTeam(values);
+    } else {
+      handleCreateTeam(values);
+    }
   };
 
   const handleModalCancel = () => {
@@ -244,12 +242,11 @@ const Teams = () => {
   };
 
   const stats = {
-    total: teams.length,
+    total: pagination.total,
     active: teams.filter(t => t.isActive).length,
-    private: teams.filter(t => t.isPrivate).length,
-    members: teams.reduce((sum, t) => sum + t.memberCount, 0)
+    inactive: teams.filter(t => !t.isActive).length
   };
-
+  
   return (
     <div>
       <Card style={{ marginBottom: 16 }}>
@@ -261,75 +258,161 @@ const Teams = () => {
             </Title>
             <p style={{ margin: 0, color: '#666' }}>Danh sách nhóm của bạn</p>
           </div>
-          <PermissionWrapper permission="create_team">
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)}>
-              Tạo Nhóm
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={loadTeams}>
+              Tải lại
             </Button>
-          </PermissionWrapper>
+            <PermissionWrapper permission="create_team">
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)}>
+                Tạo Nhóm
+              </Button>
+            </PermissionWrapper>
+          </Space>
         </div>
       </Card>
 
       {/* Statistics */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={6}><Card><Statistic title="Tổng số nhóm" value={stats.total} prefix={<TeamOutlined />} /></Card></Col>
-        <Col xs={12} sm={6}><Card><Statistic title="Nhóm đang hoạt động" value={stats.active} valueStyle={{ color: '#52c41a' }} prefix={<TeamOutlined />} /></Card></Col>
-        {/* <Col xs={12} sm={6}><Card><Statistic title="Nhóm riêng tư" value={stats.private} valueStyle={{ color: '#1890ff' }} prefix={<TeamOutlined />} /></Card></Col> */}
-        <Col xs={12} sm={6}><Card><Statistic title="Tổng thành viên" value={stats.members} prefix={<UserOutlined />} /></Card></Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic title="Tổng số nhóm" value={stats.total} prefix={<TeamOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic 
+              title="Đang hoạt động" 
+              value={stats.active} 
+              valueStyle={{ color: '#52c41a' }} 
+              prefix={<TeamOutlined />} 
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic 
+              title="Không hoạt động" 
+              value={stats.inactive} 
+              valueStyle={{ color: '#ff4d4f' }} 
+              prefix={<TeamOutlined />} 
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card>
+            <Statistic 
+              title="Tổng thành viên" 
+              value={teams.reduce((sum, t) => sum + (t.listUser?.length || 0), 0)} 
+              prefix={<UserOutlined />} 
+            />
+          </Card>
+        </Col>
       </Row>
 
       {/* Filters */}
       <Card style={{ marginBottom: 16 }}>
-        {/* <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            { key: 'all', label: `Tất cả (${teams.length})` },
-            { key: 'active', label: `Đang hoạt động (${stats.active})` },
-            { key: 'private', label: `Riêng tư (${stats.private})` },
-            { key: 'inactive', label: `Ngừng hoạt động (${teams.filter(t => !t.isActive).length})` }
-          ]}
-        /> */}
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }} align="middle">
-          <Col xs={24} md={8}>
-            <Search placeholder="Tìm kiếm nhóm..." prefix={<SearchOutlined />} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
+        <Row gutter={[16, 16]} align="middle">
+          <Col xs={24} md={12}>
+            <Search 
+              placeholder="Tìm kiếm nhóm theo tên hoặc mô tả..." 
+              prefix={<SearchOutlined />} 
+              value={searchText} 
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear 
+              onSearch={filterTeams}
+            />
           </Col>
-          <Col xs={12} md={4}>
-            <Select value={filterStatus} onChange={setFilterStatus} style={{ width: '100%' }} placeholder="Trạng thái">
+          <Col xs={12} md={6}>
+            <Select 
+              value={filterStatus} 
+              onChange={setFilterStatus} 
+              style={{ width: '100%' }} 
+              placeholder="Trạng thái"
+            >
               <Option value="all">Tất cả</Option>
               <Option value="active">Đang hoạt động</Option>
-              <Option value="inactive">Ngừng hoạt động</Option>
+              <Option value="inactive">Không hoạt động</Option>
             </Select>
           </Col>
-          <Col xs={24} md={12} style={{ textAlign: 'right' }}>
-            <Space>
-              <Button icon={<AppstoreOutlined />} type={viewMode === 'grid' ? 'primary' : 'default'} onClick={() => setViewMode('grid')}>Grid</Button>
-              <Button icon={<UnorderedListOutlined />} type={viewMode === 'list' ? 'primary' : 'default'} onClick={() => setViewMode('list')}>List</Button>
-            </Space>
+          <Col xs={12} md={6} style={{ textAlign: 'right' }}>
+            <Tag color="blue">Trang {pagination.page}/{pagination.totalPages}</Tag>
           </Col>
         </Row>
       </Card>
 
       {/* Teams Display */}
-      {filteredTeams.length === 0 ? (
-        <Card><Empty description="Không tìm thấy nhóm nào" image={Empty.PRESENTED_IMAGE_SIMPLE} /></Card>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+        </div>
+      ) : filteredTeams.length === 0 ? (
+        <Card>
+          <Empty description="Không tìm thấy nhóm nào" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        </Card>
       ) : (
-        <Row gutter={[16, 16]}>
-          {filteredTeams.map(team => (
-            <Col key={team.id} xs={24} sm={viewMode === 'list' ? 24 : 12} lg={viewMode === 'list' ? 24 : 8} xl={viewMode === 'list' ? 24 : 6}>
-              <TeamCard team={team} user={user} onView={handleViewTeam} onEdit={handleEditTeam} onDelete={handleDeleteTeam} onChat={handleChatTeam} />
-            </Col>
-          ))}
-        </Row>
+        <>
+          <Row gutter={[16, 16]}>
+            {filteredTeams.map(team => (
+              <Col key={team._id} xs={24} sm={12} lg={8} xl={6}>
+                <TeamCard 
+                  team={team} 
+                  user={user} 
+                  onView={handleViewTeam} 
+                  onEdit={handleEditTeam} 
+                  onDelete={handleDeleteTeam}
+                  onChat={handleChatTeam}
+                />
+              </Col>
+            ))}
+          </Row>
+          
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div style={{ textAlign: 'center', marginTop: 20 }}>
+              <Space>
+                <Button 
+                  disabled={pagination.page === 1} 
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                >
+                  Trang trước
+                </Button>
+                <span>Trang {pagination.page} / {pagination.totalPages}</span>
+                <Button 
+                  disabled={pagination.page === pagination.totalPages} 
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                >
+                  Trang sau
+                </Button>
+              </Space>
+            </div>
+          )}
+        </>
       )}
 
       {/* Team Form Modal */}
-      <Modal title={editingTeam ? 'Chỉnh sửa nhóm' : 'Tạo nhóm mới'} open={modalVisible} onCancel={handleModalCancel} footer={null} width={600} destroyOnClose>
-        <TeamForm visible={modalVisible} onCancel={handleModalCancel} onFinish={handleFormFinish} initialValues={editingTeam} loading={loading} users={users} />
+      <Modal 
+        title={editingTeam ? 'Chỉnh sửa nhóm' : 'Tạo nhóm mới'} 
+        open={modalVisible} 
+        onCancel={handleModalCancel} 
+        footer={null} 
+        width={600}
+        destroyOnClose
+      >
+        <TeamForm 
+          visible={modalVisible}
+          onCancel={handleModalCancel}
+          onFinish={handleFormFinish}
+          initialValues={editingTeam}
+          loading={loading}
+          users={users}
+          projects={projects}
+          editingTeam={editingTeam}
+        />
       </Modal>
 
       {/* Team Chat Drawer */}
       <Drawer title={`Team Chat - ${selectedTeam?.name}`} placement="right" onClose={() => setChatDrawerVisible(false)} open={chatDrawerVisible} width={500}>
-        {selectedTeam && <TeamChat team={selectedTeam} currentUser={user} onClose={() => setChatDrawerVisible(false)} />}
+        {selectedTeam && <TeamChat team={selectedTeam} currentUser={{...user, id: user._id || user.id}} onClose={() => setChatDrawerVisible(false)} />}
       </Drawer>
     </div>
   );

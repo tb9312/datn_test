@@ -85,6 +85,7 @@ const ProjectDetailContent = () => {
   useEffect(() => {
     if (project) {
       loadProjectUsers();
+      loadComments();
     }
   }, [project]);
 
@@ -149,7 +150,26 @@ const ProjectDetailContent = () => {
       setUsers([]);
     }
   };
-
+  // Load comments riêng
+  const loadComments = async () => {
+    try {
+      console.log('=== Loading Comments for Project ===', id);
+      
+      //Load project detail để lấy comments
+      const response = await projectService.getProjectDetail(id);
+      console.log('Project detail for comments response:', response);
+      if (response.success) {
+        setComments(response.comments || []);
+      } else {
+        console.error('❌ Failed to load comments:', response.message);
+        setComments([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading comments:', error);
+      setComments([]);
+    }
+  };
+  // Load chi tiết dự án
   const loadProjectDetail = async () => {
     console.log('Loading project detail for ID:', id);
     setLoading(true);
@@ -177,7 +197,7 @@ const ProjectDetailContent = () => {
       }
       
       setProject(projectData);
-      setComments(response.comments || []);
+      // setComments(response.comments || []);
       
       // 2. Load sub-projects (công việc) bằng API mới
       console.log('📋 Fetching sub-projects for project:', id);
@@ -350,7 +370,27 @@ const ProjectDetailContent = () => {
     
     return isMember || false;
   };
-
+  // Get thong tin user
+  const getUserFromComment = (comment) => {
+    if (comment.user && typeof comment.user === 'object') {
+      return comment.user;
+    }
+    const userId = comment.user_id || comment.user;
+    if (userId) {
+      return getUserInfo(userId);
+    }
+    return null;
+  };
+  const isCommentOwner = (comment) => {
+  if (!comment || !comment.user || !user) return false;
+  
+  // Backend đã populate user thành object
+  const commentUserId = comment.user._id || comment.user.id;
+  const currentUserId = user.id || user._id;
+  
+  return commentUserId === currentUserId;
+};
+  // Thêm comment
   const handleAddComment = async () => {
     if (!commentText.trim()) {
       message.warning('Vui lòng nhập nội dung comment');
@@ -368,10 +408,16 @@ const ProjectDetailContent = () => {
       
       if (response.success) {
         setCommentText('');
-        loadProjectDetail();
+        await loadComments();
         message.success('Thêm comment thành công!');
       } else {
-        message.error(response.message || 'Thêm comment thất bại!');
+        if (response.code === 403) {
+          message.error('Bạn không có quyền comment trong dự án này');
+        } else if (response.code === 404) {
+          message.error('Dự án không tồn tại hoặc đã bị xóa');
+        } else {
+          message.error(response.message || `Lỗi ${response.code}: Thêm comment thất bại!`);
+        }
       }
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -383,13 +429,13 @@ const ProjectDetailContent = () => {
   
   // Mở modal chỉnh sửa comment
   const handleEditComment = (comment) => {
-    if (comment.user_id !== user?.id) {
+     if (!isCommentOwner(comment)) {
       message.warning('Bạn không được chỉnh sửa comment của người khác');
       return;
     }
     
     setEditingComment(comment);
-    setEditCommentText(comment.comment);
+    setEditCommentText(comment.content || comment.comment || '');
     setCommentModalVisible(true);
   };
 
@@ -408,9 +454,15 @@ const ProjectDetailContent = () => {
         setCommentModalVisible(false);
         setEditingComment(null);
         setEditCommentText('');
-        loadProjectDetail();
+        await loadComments();
       } else {
-        message.error(response.message || 'Chỉnh sửa comment thất bại!');
+        console.error('❌ Edit comment failed:', response);
+        
+        if (response.code === 403) {
+          message.error('Bạn không được chỉnh sửa comment của người khác');
+        } else {
+          message.error(response.message || 'Chỉnh sửa comment thất bại!');
+        }
       }
     } catch (error) {
       console.error('Error editing comment:', error);
@@ -420,7 +472,7 @@ const ProjectDetailContent = () => {
 
   // Xóa comment
   const handleDeleteComment = async (comment) => {
-    if (comment.user_id !== user?.id) {
+    if (!isCommentOwner(comment)) {
       message.warning('Bạn không được xóa comment của người khác');
       return;
     }
@@ -430,7 +482,7 @@ const ProjectDetailContent = () => {
       
       if (response.success) {
         message.success(response.message || 'Đã xóa comment!');
-        loadProjectDetail();
+        await loadComments();
       } else {
         message.error(response.message || 'Xóa comment thất bại!');
       }
@@ -904,8 +956,11 @@ const ProjectDetailContent = () => {
                   <List
                     dataSource={comments.sort((a, b) => (b.position || 0) - (a.position || 0))}
                     renderItem={(comment) => {
-                      const commentUser = getUserInfo(comment.user_id);
-                      const isCommentOwner = comment.user_id === user?.id;
+                      const commentUser = comment.user;
+                      const isCommentOwner = commentUser && 
+                        (commentUser._id === user?.id || commentUser.id === user?.id);
+  
+                      const commentContent = comment.content || comment.comment || '';
                       
                       return (
                         <List.Item 
@@ -961,7 +1016,7 @@ const ProjectDetailContent = () => {
                                 {isCommentOwner && (
                                   <Tag color="blue" size="small">Bạn</Tag>
                                 )}
-                                {comment.user_id === project.createdBy && (
+                                {commentUser && commentUser._id === project.createdBy && (
                                   <Tag color="gold" size="small" icon={<CrownOutlined />}>
                                     Phụ trách
                                   </Tag>
@@ -975,7 +1030,7 @@ const ProjectDetailContent = () => {
                             }
                             description={
                               <div>
-                                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{comment.comment}</p>
+                                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{comment.content || comment.comment || ''}</p>
                                 {comment.updatedAt && comment.updatedAt !== comment.createdAt && (
                                   <Text type="secondary" style={{ fontSize: '11px', marginTop: 4, display: 'block' }}>
                                     <EditOutlined /> Đã chỉnh sửa {moment(comment.updatedAt).fromNow()}

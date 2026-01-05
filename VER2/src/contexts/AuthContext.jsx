@@ -58,7 +58,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const saveAuth = ({ token, userData, apiVersion = "v1", persist = "local" }) => {
+  const saveAuth = ({
+    token,
+    userData,
+    apiVersion = "v1",
+    persist = "local",
+  }) => {
     if (persist === "session") {
       sessionStorage.setItem(STORAGE_KEYS.TOKEN, token);
     } else {
@@ -86,7 +91,7 @@ export const AuthProvider = ({ children }) => {
       const token = data.user.token;
       let userData = null;
       if (data.user) {
-        console.log("hello")
+        console.log("hello");
         userData = {
           ...data.user,
           _id: data.user._id,
@@ -95,7 +100,7 @@ export const AuthProvider = ({ children }) => {
           token,
         };
       }
-  
+
       try {
         console.log("ℹ️ Fetching user detail...");
         const detailRes = await axios.get(ep.detail, {
@@ -148,15 +153,23 @@ export const AuthProvider = ({ children }) => {
   };
   const register = async (fullName, email, password) => {
     try {
-      const res = await axios.post(endpoints.v1.register, { fullName, email, password });
+      const res = await axios.post(endpoints.v1.register, {
+        fullName,
+        email,
+        password,
+      });
       const data = res.data;
 
       if (!data?.success && data?.code !== 200) {
-        return { success: false, message: data?.message || "Đăng ký thất bại!" };
+        return {
+          success: false,
+          message: data?.message || "Đăng ký thất bại!",
+        };
       }
       return await login(email, password, false);
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message || "Lỗi đăng ký";
+      const errorMsg =
+        error.response?.data?.message || error.message || "Lỗi đăng ký";
       return { success: false, message: errorMsg };
     }
   };
@@ -167,15 +180,25 @@ export const AuthProvider = ({ children }) => {
       const data = res.data;
 
       if (data?.code && data.code !== 200) {
-        return { success: false, message: data?.message || "Email không tồn tại!" };
+        return {
+          success: false,
+          message: data?.message || "Email không tồn tại!",
+        };
       }
       if (data?.success === false) {
-        return { success: false, message: data?.message || "Email không tồn tại!" };
+        return {
+          success: false,
+          message: data?.message || "Email không tồn tại!",
+        };
       }
 
-      return { success: true, message: data?.message || "Đã gửi mã OTP qua email!" };
+      return {
+        success: true,
+        message: data?.message || "Đã gửi mã OTP qua email!",
+      };
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message || "Lỗi gửi OTP";
+      const errorMsg =
+        error.response?.data?.message || error.message || "Lỗi gửi OTP";
       return { success: false, message: errorMsg };
     }
   };
@@ -192,29 +215,48 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: data?.message || "OTP không hợp lệ" };
       }
 
-      return { success: true, message: data?.message || "Xác thực thành công!" };
+      return {
+        success: true,
+        message: data?.message || "Xác thực thành công!",
+      };
     } catch (error) {
-      const errorMsg = error.response?.data?.message || error.message || "OTP không hợp lệ";
+      const errorMsg =
+        error.response?.data?.message || error.message || "OTP không hợp lệ";
       return { success: false, message: errorMsg };
     }
   };
 
   const resetPassword = async (email, password, confirmPassword) => {
     try {
-      const res = await axios.post(endpoints.v1.reset, { email, password, confirmPassword });
+      const res = await axios.post(endpoints.v1.reset, {
+        email,
+        password,
+        confirmPassword,
+      });
       const data = res.data;
 
       if (data?.code && data.code !== 200) {
-        return { success: false, message: data?.message || "Thay đổi mật khẩu thất bại!" };
+        return {
+          success: false,
+          message: data?.message || "Thay đổi mật khẩu thất bại!",
+        };
       }
       if (data?.success === false) {
-        return { success: false, message: data?.message || "Thay đổi mật khẩu thất bại!" };
+        return {
+          success: false,
+          message: data?.message || "Thay đổi mật khẩu thất bại!",
+        };
       }
 
-      return { success: true, message: data?.message || "Thành công! Vui lòng đăng nhập lại." };
+      return {
+        success: true,
+        message: data?.message || "Thành công! Vui lòng đăng nhập lại.",
+      };
     } catch (error) {
       const errorMsg =
-        error.response?.data?.message || error.message || "Lỗi thay đổi mật khẩu";
+        error.response?.data?.message ||
+        error.message ||
+        "Lỗi thay đổi mật khẩu";
       return { success: false, message: errorMsg };
     }
   };

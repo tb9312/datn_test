@@ -45,6 +45,31 @@ export const ragService = {
       throw new Error(error.message || 'Lỗi khi kiểm tra status');
     }
   },
+
+  /**
+   * Debug: Check current user và token
+   */
+  async debugGetCurrentUser() {
+    try {
+      const response = await apiClientV1.get('/rag/me');
+      return response;
+    } catch (error) {
+      throw new Error(error.message || 'Lỗi khi kiểm tra user');
+    }
+  },
+
+  /**
+   * Debug: Log token stored in localStorage
+   */
+  debugCheckLocalStorage() {
+    const token = localStorage.getItem('tokenLogin');
+    console.log('[RAG Debug] localStorage.tokenLogin:', token ? token.substring(0, 30) + '...' : 'NOT FOUND');
+    console.log('[RAG Debug] All localStorage keys:', Object.keys(localStorage));
+    return {
+      tokenLogin: token,
+      allKeys: Object.keys(localStorage),
+    };
+  },
 };
 
 

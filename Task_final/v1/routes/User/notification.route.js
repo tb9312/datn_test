@@ -6,5 +6,7 @@ route.get("/", controller.index);
 
 route.patch("/isReaded/:id", controller.isreaded);
 
+route.patch("/allReaded", controller.allReaded);
+
 route.patch("/delete/:id", controller.delete);
 module.exports = route;

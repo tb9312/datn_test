@@ -33,6 +33,8 @@ import {
   CommentOutlined,
   SendOutlined,
   ClockCircleOutlined,
+  CrownOutlined,
+  LockOutlined,
   FlagOutlined,
   TagOutlined,
   TeamOutlined,
@@ -56,7 +58,6 @@ const { TextArea } = Input;
 
 const SubProjectDetail = () => {
   const { id } = useParams();
-
   const navigate = useNavigate();
   const location = useLocation();
   const [task, setTask] = useState(null);
@@ -68,11 +69,18 @@ const SubProjectDetail = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [editingComment, setEditingComment] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   
   // Lấy parentProjectId từ state hoặc từ task data
   const parentProjectId = location.state?.parentProjectId;
+
+  console.log('=== DEBUG SUBPROJECT DETAIL ===');
+  console.log('Task ID:', id);
+  console.log('Parent Project ID from state:', parentProjectId);
 
   useEffect(() => {
     if (id) {
@@ -80,11 +88,34 @@ const SubProjectDetail = () => {
     }
   }, [id]);
 
+  // Load comments riêng
+  const loadComments = async () => {
+    try {
+      console.log('📥 Loading comments for task:', id);
+      
+      // Load task detail để lấy comments
+      const response = await projectService.getProjectDetail(id);
+      
+      if (response.success) {
+        console.log('✅ Comments loaded:', response.comments?.length || 0);
+        setComments(response.comments || []);
+      } else {
+        console.error('❌ Failed to load comments:', response.message);
+        setComments([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading comments:', error);
+      setComments([]);
+    }
+  };
+
   const loadTaskDetail = async () => {
     setLoading(true);
     try {
       // 1. Load task detail
       const taskResponse = await projectService.getProjectDetail(id);
+      
+      console.log('Task detail API response:', taskResponse);
       
       if (!taskResponse.success || !taskResponse.data) {
         message.error('Không thể tải chi tiết công việc');
@@ -97,19 +128,19 @@ const SubProjectDetail = () => {
       
       // 2. Load parent project info (ưu tiên từ state, nếu không thì từ task data)
       const pid = parentProjectId || taskData.projectParentId;
+      console.log('Loading parent project with ID:', pid);
+      
       if (pid) {
         const parentResponse = await projectService.getProjectDetail(pid);
         if (parentResponse.success) {
           setParentProject(parentResponse.data);
+        } else {
+          console.log('⚠️ Could not load parent project');
         }
       }
       
       // 3. Load comments
-      const commentsResponse = await projectService.getCommentsByProject?.(id) || 
-                               { success: true, data: taskResponse.comments || [] };
-      if (commentsResponse.success) {
-        setComments(commentsResponse.data || []);
-      }
+      await loadComments();
       
       // 4. Load users
       const usersResponse = await userService.getUsers();
@@ -125,6 +156,32 @@ const SubProjectDetail = () => {
       setLoading(false);
     }
   };
+
+  // Lấy thông tin user từ comment
+  const getUserFromComment = (comment) => {
+    // Xử lý cả 2 trường hợp: user (object) hoặc user_id (string)
+    if (comment.user && typeof comment.user === 'object') {
+      return comment.user;
+    }
+    
+    // Nếu là user_id, tìm trong danh sách users
+    const userId = comment.user_id || comment.user;
+    if (userId) {
+      return getUserInfo(userId);
+    }
+    
+    return null;
+  };
+
+  // Hàm kiểm tra quyền sở hữu comment (đổi tên để tránh trùng)
+  const checkCommentOwnership = (comment) => {
+    const commentUser = getUserFromComment(comment);
+    if (commentUser) {
+      return commentUser._id === user?.id || commentUser.id === user?.id;
+    }
+    return comment.user_id === user?.id;
+  };
+
   const handleEditTask = (task) => {
     console.log('Edit task:', task);
     setEditingTask(task);
@@ -151,28 +208,153 @@ const SubProjectDetail = () => {
       setFormLoading(false);
     }
   };
+
+  // Kiểm tra user có thể comment không
+  const canComment = () => {
+    if (!task || !user) return false;
+    
+    // 1. Người tạo task có thể comment
+    if (task.createdBy === user.id) return true;
+    
+    // 2. Thành viên trong task có thể comment
+    const isMember = task.listUser?.some(member => {
+      const memberId = typeof member === 'object' ? member._id : member;
+      return memberId === user.id;
+    });
+    
+    // 3. Người tạo parent project có thể comment
+    if (parentProject && parentProject.createdBy === user.id) return true;
+    
+    return isMember || false;
+  };
+
+  // Thêm comment
   const handleAddComment = async () => {
     if (!commentText.trim()) {
       message.warning('Vui lòng nhập nội dung comment');
       return;
     }
 
+    if (!canComment()) {
+      message.warning('Bạn không có quyền comment trong công việc này');
+      return;
+    }
+
+    console.log('🔄 Adding comment to task:', commentText);
+    
+    setSubmitting(true);
     try {
-      setSubmitting(true);
       const response = await projectService.addComment(id, commentText);
       
+      console.log('📤 Comment API response:', response);
+      
       if (response.success) {
+        message.success(response.message || 'Thêm comment thành công!');
         setCommentText('');
-        loadTaskDetail();
-        message.success('Thêm comment thành công!');
+        
+        // Load lại comments sau khi thêm
+        await loadComments();
+        
       } else {
-        message.error(response.message || 'Thêm comment thất bại!');
+        console.error('❌ Comment failed:', response);
+        
+        // Hiển thị thông báo lỗi chi tiết
+        if (response.code === 403) {
+          message.error('Bạn không có quyền comment trong công việc này');
+        } else if (response.code === 404) {
+          message.error('Công việc không tồn tại hoặc đã bị xóa');
+        } else {
+          message.error(response.message || `Lỗi ${response.code}: Thêm comment thất bại!`);
+        }
       }
     } catch (error) {
-      console.error('Error adding comment:', error);
+      console.error('💥 Error adding comment:', error);
       message.error(error.message || 'Thêm comment thất bại!');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Mở modal chỉnh sửa comment
+  const handleEditComment = (comment) => {
+    if (!checkCommentOwnership(comment)) {
+      message.warning('Bạn không được chỉnh sửa comment của người khác');
+      return;
+    }
+    
+    setEditingComment(comment);
+    setEditCommentText(comment.content || comment.comment || '');
+    setCommentModalVisible(true);
+  };
+
+  // Lưu comment sau khi chỉnh sửa
+  const handleSaveCommentEdit = async () => {
+    if (!editCommentText.trim()) {
+      message.warning('Vui lòng nhập nội dung comment');
+      return;
+    }
+
+    try {
+      console.log('✏️ Editing comment:', editingComment._id);
+      
+      const response = await projectService.editComment(editingComment._id, editCommentText);
+      
+      console.log('Edit comment response:', response);
+      
+      if (response.success) {
+        message.success(response.message || 'Đã chỉnh sửa comment!');
+        setCommentModalVisible(false);
+        setEditingComment(null);
+        setEditCommentText('');
+        
+        // Load lại comments
+        await loadComments();
+      } else {
+        console.error('❌ Edit comment failed:', response);
+        
+        if (response.code === 403) {
+          message.error('Bạn không được chỉnh sửa comment của người khác');
+        } else {
+          message.error(response.message || 'Chỉnh sửa comment thất bại!');
+        }
+      }
+    } catch (error) {
+      console.error('💥 Error editing comment:', error);
+      message.error(error.message || 'Chỉnh sửa comment thất bại!');
+    }
+  };
+
+  // Xóa comment
+  const handleDeleteComment = async (comment) => {
+    if (!checkCommentOwnership(comment)) {
+      message.warning('Bạn không được xóa comment của người khác');
+      return;
+    }
+
+    try {
+      console.log('🗑️ Deleting comment:', comment._id);
+      
+      const response = await projectService.deleteComment(comment._id);
+      
+      console.log('Delete comment response:', response);
+      
+      if (response.success) {
+        message.success(response.message || 'Đã xóa comment!');
+        
+        // Load lại comments
+        await loadComments();
+      } else {
+        console.error('❌ Delete comment failed:', response);
+        
+        if (response.code === 403) {
+          message.error('Bạn không được xóa comment của người khác');
+        } else {
+          message.error(response.message || 'Xóa comment thất bại!');
+        }
+      }
+    } catch (error) {
+      console.error('💥 Error deleting comment:', error);
+      message.error(error.message || 'Xóa comment thất bại!');
     }
   };
 
@@ -390,7 +572,7 @@ const SubProjectDetail = () => {
               {canEditTask() && (
                 <Button 
                   icon={<EditOutlined />}
-                  onClick={() => handleEditTask(task)} // SỬA DÒNG NÀY
+                  onClick={() => handleEditTask(task)}
                 >
                   Sửa
                 </Button>
@@ -457,17 +639,19 @@ const SubProjectDetail = () => {
           <Col xs={24} lg={8}>
             <Card title="Thông tin công việc" style={{ marginBottom: 16 }}>
               <Descriptions column={1} size="small">
-                {/* <Descriptions.Item label="Người tạo">
-                  <Space>
-                    <Avatar size="small" src={taskCreator?.avatar} icon={<UserOutlined />} />
-                    <span>
-                      {taskCreator?.fullName || task.createdBy}
-                      {isTaskCreator && (
-                        <Tag color="green" size="small" style={{ marginLeft: 8 }}>Bạn</Tag>
-                      )}
-                    </span>
-                  </Space>
-                </Descriptions.Item> */}
+                {taskCreator && (
+                  <Descriptions.Item label="Người tạo">
+                    <Space>
+                      <Avatar size="small" src={taskCreator?.avatar} icon={<UserOutlined />} />
+                      <span>
+                        {taskCreator?.fullName || task.createdBy}
+                        {isTaskCreator && (
+                          <Tag color="green" size="small" style={{ marginLeft: 8 }}>Bạn</Tag>
+                        )}
+                      </span>
+                    </Space>
+                  </Descriptions.Item>
+                )}
                 
                 {assignee && (
                   <Descriptions.Item label="Người thực hiện">
@@ -579,64 +763,111 @@ const SubProjectDetail = () => {
             <Card>
               <Tabs defaultActiveKey="comments">
                 <TabPane tab={`Thảo luận (${comments.length})`} key="comments">
-                  {/* Comment input */}
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <Avatar 
-                        size="large" 
-                        src={user?.avatar} 
-                        icon={<UserOutlined />}
-                        style={{ backgroundColor: '#1890ff' }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <TextArea
-                          rows={3}
-                          placeholder="Thêm bình luận về công việc này..."
-                          value={commentText}
-                          onChange={(e) => setCommentText(e.target.value)}
-                          maxLength={500}
-                          showCount
+                  {/* Kiểm tra quyền comment trước khi hiển thị input */}
+                  {canComment() ? (
+                    <div style={{ marginBottom: 24 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Avatar 
+                          size="large" 
+                          src={user?.avatar} 
+                          icon={<UserOutlined />}
+                          style={{ backgroundColor: '#1890ff' }}
                         />
-                        <div style={{ marginTop: 8, textAlign: 'right' }}>
-                          <Button
-                            type="primary"
-                            icon={<SendOutlined />}
-                            onClick={handleAddComment}
-                            loading={submitting}
-                            disabled={!commentText.trim()}
-                          >
-                            Gửi
-                          </Button>
+                        <div style={{ flex: 1 }}>
+                          <TextArea
+                            rows={3}
+                            placeholder="Thêm bình luận về công việc này..."
+                            value={commentText}
+                            onChange={(e) => setCommentText(e.target.value)}
+                            maxLength={500}
+                            showCount
+                          />
+                          <div style={{ marginTop: 8, textAlign: 'right' }}>
+                            <Button
+                              type="primary"
+                              icon={<SendOutlined />}
+                              onClick={handleAddComment}
+                              loading={submitting}
+                              disabled={!commentText.trim()}
+                            >
+                              Gửi
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <Card style={{ marginBottom: 16, backgroundColor: '#fff2e8' }}>
+                      <div style={{ textAlign: 'center', padding: '16px' }}>
+                        <LockOutlined style={{ fontSize: 24, color: '#fa8c16', marginBottom: 8 }} />
+                        <div>Bạn không có quyền comment trong công việc này</div>
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                          Chỉ người tạo, người thực hiện và thành viên của công việc mới được comment
+                        </Text>
+                      </div>
+                    </Card>
+                  )}
                   
                   {/* Comments list */}
                   {comments.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px 0' }}>
                       <CommentOutlined style={{ fontSize: 48, color: '#d9d9d9', marginBottom: 16 }} />
                       <div>Chưa có bình luận nào</div>
-                      <Text type="secondary" style={{ fontSize: '12px', marginTop: 8 }}>
-                        Hãy là người đầu tiên bình luận về công việc này
-                      </Text>
+                      {!canComment() && (
+                        <Text type="secondary" style={{ fontSize: '12px', marginTop: 8 }}>
+                          Tham gia công việc để bình luận
+                        </Text>
+                      )}
                     </div>
                   ) : (
                     <List
-                      dataSource={comments}
+                      dataSource={comments.sort((a, b) => (b.position || 0) - (a.position || 0))}
                       renderItem={(comment) => {
-                        const commentUser = getUserInfo(comment.user_id);
-                        const isCommentOwner = comment.user_id === user?.id;
+                        const commentUser = getUserFromComment(comment);
+                        const isOwner = checkCommentOwnership(comment); // Sửa ở đây
                         
                         return (
-                          <List.Item>
+                          <List.Item 
+                            actions={[
+                              isOwner && (
+                                <Button
+                                  size="small"
+                                  type="text"
+                                  icon={<EditOutlined />}
+                                  onClick={() => handleEditComment(comment)}
+                                >
+                                  Sửa
+                                </Button>
+                              ),
+                              
+                              isOwner && (
+                                <Popconfirm
+                                  title="Xóa comment"
+                                  description="Bạn có chắc chắn muốn xóa comment này?"
+                                  onConfirm={() => handleDeleteComment(comment)}
+                                  okText="Xóa"
+                                  cancelText="Hủy"
+                                  okType="danger"
+                                >
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                  >
+                                    Xóa
+                                  </Button>
+                                </Popconfirm>
+                              )
+                            ].filter(Boolean)}
+                          >
                             <List.Item.Meta
                               avatar={
                                 <Avatar 
                                   size="large"
                                   src={commentUser?.avatar}
                                   style={{ 
-                                    backgroundColor: isCommentOwner ? '#1890ff' : '#d9d9d9'
+                                    backgroundColor: isOwner ? '#1890ff' : '#d9d9d9'
                                   }}
                                 >
                                   {commentUser?.fullName?.charAt(0) || comment.userName?.charAt(0) || <UserOutlined />}
@@ -645,8 +876,13 @@ const SubProjectDetail = () => {
                               title={
                                 <Space>
                                   <strong>{commentUser?.fullName || comment.userName}</strong>
-                                  {isCommentOwner && (
+                                  {isOwner && (
                                     <Tag color="blue" size="small">Bạn</Tag>
+                                  )}
+                                  {commentUser && commentUser._id === task.createdBy && (
+                                    <Tag color="gold" size="small" icon={<CrownOutlined />}>
+                                      Người tạo
+                                    </Tag>
                                   )}
                                   <span style={{ color: '#999', fontSize: 12 }}>
                                     {moment(comment.createdAt || comment.created_at).fromNow()}
@@ -654,7 +890,16 @@ const SubProjectDetail = () => {
                                 </Space>
                               }
                               description={
-                                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{comment.comment}</p>
+                                <div>
+                                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                    {comment.content || comment.comment}
+                                  </p>
+                                  {comment.updatedAt && comment.updatedAt !== comment.createdAt && (
+                                    <Text type="secondary" style={{ fontSize: '11px', marginTop: 4, display: 'block' }}>
+                                      <EditOutlined /> Đã chỉnh sửa {moment(comment.updatedAt).fromNow()}
+                                    </Text>
+                                  )}
+                                </div>
                               }
                             />
                           </List.Item>
@@ -709,6 +954,50 @@ const SubProjectDetail = () => {
             </Card>
           </Col>
         </Row>
+        
+        {/* Modal chỉnh sửa comment */}
+        <Modal
+          title="Chỉnh sửa comment"
+          open={commentModalVisible}
+          onCancel={() => {
+            setCommentModalVisible(false);
+            setEditingComment(null);
+            setEditCommentText('');
+          }}
+          footer={[
+            <Button 
+              key="cancel" 
+              onClick={() => {
+                setCommentModalVisible(false);
+                setEditingComment(null);
+                setEditCommentText('');
+              }}
+            >
+              Hủy
+            </Button>,
+            <Button 
+              key="submit" 
+              type="primary" 
+              onClick={handleSaveCommentEdit}
+              loading={submitting}
+              disabled={!editCommentText.trim()}
+            >
+              Lưu thay đổi
+            </Button>
+          ]}
+        >
+          <TextArea
+            rows={4}
+            placeholder="Nhập nội dung comment..."
+            value={editCommentText}
+            onChange={(e) => setEditCommentText(e.target.value)}
+            maxLength={500}
+            showCount
+            autoSize={{ minRows: 3, maxRows: 6 }}
+          />
+        </Modal>
+        
+        {/* Modal chỉnh sửa công việc */}
         {editModalVisible && (
           <Modal
             title="Chỉnh sửa công việc"
@@ -743,6 +1032,5 @@ const SubProjectDetail = () => {
     </App>
   );
 };
-
 
 export default SubProjectDetail;

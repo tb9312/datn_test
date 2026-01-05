@@ -9,9 +9,18 @@ const chatSchema = new mongoose.Schema(
       index: true,
     },
 
+    // ✅ Khi bạn chưa có Team ObjectId thật thì để null
     room_chat_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Team",
+      required: false,
+      default: null,
+      index: true,
+    },
+
+    // ✅ Dùng key string để group theo team mock: team_1, team_2...
+    room_key: {
+      type: String,
       required: true,
       index: true,
     },
@@ -22,13 +31,8 @@ const chatSchema = new mongoose.Schema(
       default: "",
     },
 
-    images: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
-
+    images: [{ type: String, trim: true }],
+    
     messageType: {
       type: String,
       enum: ["text", "image", "mixed"],
@@ -54,5 +58,4 @@ const chatSchema = new mongoose.Schema(
 );
 
 const Chat = mongoose.model("Chat", chatSchema, "chats");
-
 module.exports = Chat;

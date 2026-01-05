@@ -1,4 +1,5 @@
 const md5 = require("md5");
+const jwt = require("jsonwebtoken");
 
 const generateHelper = require("../../../helpers/generate");
 const sendMailHelper = require("../../../helpers/send-mail");
@@ -39,46 +40,39 @@ module.exports.register = async (req, res) => {
   }
 };
 
-//[POST] /api/v1/users/login
+// [POST] /api/v1/users/login
 module.exports.login = async (req, res) => {
-  // console.log(req.body);
-  const email = req.body.email;
-  const password = req.body.password;
-  const user = await User.findOne({
-    email: email,
-    deleted: false,
-  });
-  if (!user) {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email, deleted: false });
+    if (!user) {
+      return res.status(400).json({ message: "Email không tồn tại" });
+    }
+
+    if (md5(password) !== user.password) {
+      return res.status(401).json({ message: "Sai mật khẩu" });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role || "user" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
     res.json({
-      code: 400,
-      message: "Dang nhap khong thanh cong",
+      message: "Đăng nhập thành công",
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        token: token,
+      },
     });
-    return;
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
-  // console(email);
-  console.log(md5(password));
-  console.log(user);
-  if (md5(password) !== user.password) {
-    res.json({
-      code: 404,
-      message: "sai mat khau",
-    });
-    return;
-  }
-  const userInfo = {
-    _id: user._id,
-    fullName: user.fullName,
-    email: user.email,
-    role: user.role || "user",
-  };
-  const token = user.token;
-  res.cookie("token", token);
-  res.json({
-    code: 200,
-    message: "Dang nhap thanh cong",
-    token: token,
-    user: userInfo,
-  });
 };
 //[POST]/api/v1/users/password/forgot
 module.exports.forgotPassword = async (req, res) => {

@@ -22,7 +22,19 @@ const projectSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+projectSchema.index({
+  createdBy: 1,
+  deleted: 1,
+  status: 1,
+  createdAt: -1,
+});
 
+// Cho overdue job
+projectSchema.index({
+  status: 1,
+  timeFinish: 1,
+  deleted: 1,
+});
 const Project = mongoose.model("Project", projectSchema, "projects");
 
 module.exports = Project;

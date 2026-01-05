@@ -275,7 +275,6 @@ const RAGChatbot = ({ onClose }) => {
   };
 
   if (isMinimized) {
-    const unreadCount = messages.filter(m => m.type === 'bot' && m.id > 1).length;
     return (
       <div className="rag-chatbot-minimized">
         <Button
@@ -285,11 +284,6 @@ const RAGChatbot = ({ onClose }) => {
           className="rag-chatbot-minimize-button"
           title="Mở AI Assistant"
         />
-        {unreadCount > 0 && (
-          <span className="rag-chatbot-badge">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
-        )}
       </div>
     );
   }
@@ -304,7 +298,7 @@ const RAGChatbot = ({ onClose }) => {
         </Space>
       }
       extra={
-        <Space size="small" style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Tooltip title="Thu nhỏ">
             <Button
               type="text"
@@ -313,15 +307,7 @@ const RAGChatbot = ({ onClose }) => {
               style={{ color: 'white', minWidth: '32px', height: '32px' }}
             />
           </Tooltip>
-          <Tooltip title="Đóng">
-            <Button
-              type="text"
-              icon={<CloseOutlined />}
-              onClick={onClose || (() => setIsMinimized(true))}
-              style={{ color: 'white', minWidth: '32px', height: '32px' }}
-            />
-          </Tooltip>
-        </Space>
+        </div>
       }
       style={{
         position: 'fixed',

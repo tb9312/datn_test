@@ -1,13 +1,21 @@
 const ragService = require('../services/rag.service');
 
-/**
- * [POST] /api/v1/rag/chat
- * Chat với RAG system
- */
 module.exports.chat = async (req, res) => {
   try {
     const { message, history = [] } = req.body;
-    const userId = req.user?.id || null;
+
+    // req.user được set bởi middleware auth
+    if (!req.user) {
+      console.log('[RAG] No user found in request');
+      return res.json({
+        code: 401,
+        message: 'Vui lòng đăng nhập để sử dụng AI Assistant',
+        data: null
+      });
+    }
+
+    const userId = req.user._id;
+    const userRole = req.user.role; // 'USER' hoặc 'MANAGER'
 
     if (!message || !message.trim()) {
       return res.json({
@@ -16,8 +24,10 @@ module.exports.chat = async (req, res) => {
       });
     }
 
-    // Generate response với RAG (truyền userId để hỗ trợ task suggestions)
-    const response = await ragService.generateResponse(message, history, userId);
+    console.log('[RAG Chat] User:', userId, 'Role:', userRole, 'Query:', message.substring(0, 50));
+
+    // Generate response với RAG - truyền thêm userRole để phân quyền
+    const response = await ragService.generateResponse(message, history, userId, userRole);
 
     res.json({
       code: 200,
@@ -31,10 +41,11 @@ module.exports.chat = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('RAG Chat Error:', error);
+    console.error('[RAG Chat] Error:', error.message);
     res.json({
       code: 500,
-      message: 'Lỗi khi xử lý câu hỏi: ' + error.message,
+      message: 'Lỗi khi xử lý câu hỏi. Vui lòng thử lại sau.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -103,6 +114,45 @@ module.exports.status = async (req, res) => {
     res.json({
       code: 500,
       message: 'Lỗi khi kiểm tra status: ' + error.message,
+    });
+  }
+};
+
+/**
+ * [GET] /api/v1/rag/me
+ * Kiểm tra thông tin user hiện tại (dùng để debug authentication)
+ * Endpoint này yêu cầu auth để verify token của user
+ */
+module.exports.getCurrentUser = async (req, res) => {
+  try {
+    // req.user được set bởi middleware auth
+    if (!req.user) {
+      return res.json({
+        code: 401,
+        message: 'Không có user được xác thực',
+        data: null
+      });
+    }
+
+    res.json({
+      code: 200,
+      message: 'Success',
+      data: {
+        user: {
+          _id: req.user._id,
+          email: req.user.email || 'N/A',
+          username: req.user.username || 'N/A',
+          fullName: req.user.fullName || 'N/A',
+        },
+        authenticated: true,
+        timestamp: new Date().toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error('RAG Get User Error:', error);
+    res.json({
+      code: 500,
+      message: 'Lỗi khi lấy thông tin user: ' + error.message,
     });
   }
 };

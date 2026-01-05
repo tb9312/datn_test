@@ -13,12 +13,7 @@ const taskSchema = new mongoose.Schema(
       trim: true,
     },
 
-    status: {
-      type: String,
-      enum: ["todo", "doing", "done"],
-      default: "todo",
-      index: true,
-    },
+    status: String,
 
     priority: {
       type: String,
@@ -63,6 +58,19 @@ const taskSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+taskSchema.index({
+  createdBy: 1,
+  deleted: 1,
+  status: 1,
+  createdAt: -1,
+});
+
+// Cho overdue job
+taskSchema.index({
+  status: 1,
+  timeFinish: 1,
+  deleted: 1,
+});
 
 const Task = mongoose.model("Task", taskSchema, "tasks");
 
