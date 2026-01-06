@@ -452,15 +452,17 @@ class RAGService {
 
     // 🔴 PRIORITY 0.5: Task Context Query - HỎI THÔNG TIN TASK CỤ THỂ (ưu tiên cao nhất)
     if (
-      (normalized.includes('task') && (
+      ((normalized.includes('task') || normalized.includes('cong viec') || normalized.includes('nhiem vu')) && (
         normalized.includes('nam trong du an nao') ||
         normalized.includes('thuoc du an nao') ||
         normalized.includes('du an nao') ||
         normalized.includes('co tai lieu') ||
         normalized.includes('tai lieu nao') ||
         normalized.includes('file dinh kem') ||
-        normalized.includes('thong tin ve task') ||
-        normalized.includes('chi tiet task') ||
+        normalized.includes('thong tin ve') ||  // "thông tin về [task/công việc/nhiệm vụ]"
+        normalized.includes('thong tin') ||     // "thông tin [task/công việc]"
+        normalized.includes('chi tiet') ||      // "chi tiết [task/công việc]"
+        normalized.includes('chi tiet ve') ||
         normalized.includes('lien quan den du an') ||
         normalized.includes('project nao')
       ))
@@ -2098,28 +2100,53 @@ class RAGService {
    * Trích xuất tên task từ query
    */
   extractTaskNameFromQuery(query) {
-    const normalized = query.toLowerCase();
+    // Normalize query để loại bỏ dấu tiếng Việt cho pattern matching
+    const normalizeForPattern = (str) => {
+      return str.toLowerCase()
+        .replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, 'a')
+        .replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, 'e')
+        .replace(/ì|í|ị|ỉ|ĩ/g, 'i')
+        .replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, 'o')
+        .replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, 'u')
+        .replace(/ỳ|ý|ỵ|ỷ|ỹ/g, 'y')
+        .replace(/đ/g, 'd');
+    };
+    
+    const normalized = normalizeForPattern(query);
     
     // Patterns: "task A nằm trong...", "công việc Y thuộc...", "nhiệm vụ Z có..."
     const patterns = [
-      // Pattern 1: "task [tên] nằm trong..."
+      // Pattern 1: "task [tên] nằm trong..." (normalized)
       /task\s+(.+?)\s+(?:nam trong|thuoc|co tai lieu|co file|lien quan den|trong du an|du an nao|project nao)/i,
       // Pattern 2: "công việc [tên] nằm trong..."
       /cong viec\s+(.+?)\s+(?:nam trong|thuoc|co tai lieu|co file|lien quan den|trong du an|du an nao)/i,
       // Pattern 3: "nhiệm vụ [tên] nằm trong..."
       /nhiem vu\s+(.+?)\s+(?:nam trong|thuoc|co tai lieu|co file|lien quan den|trong du an|du an nao)/i,
-      // Pattern 4: Fallback - lấy text sau "task" đến hết
+      // Pattern 4: "thông tin task [tên]"
+      /thong tin\s+(?:task|cong viec|nhiem vu)\s+(.+)$/i,
+      // Pattern 5: "chi tiết task [tên]"
+      /chi tiet\s+(?:task|cong viec|nhiem vu)\s+(.+)$/i,
+      // Pattern 6: Fallback - lấy text sau "task" đến hết
       /task\s+(.+)$/i,
       /cong viec\s+(.+)$/i,
       /nhiem vu\s+(.+)$/i,
     ];
 
     for (const pattern of patterns) {
-      const match = query.match(pattern);
+      const match = normalized.match(pattern);
       if (match && match[1]) {
         let extracted = match[1].trim();
         // Loại bỏ các từ khóa cuối câu không cần thiết (nếu vẫn còn)
-        extracted = extracted.replace(/\s+(nay|nao|nay|thuoc|nam trong|nam|co|trong|lien quan|du an nao|project nao|tai lieu|file).*$/i, '').trim();
+        extracted = extracted.replace(/\s+(nay|nao|thuoc|nam trong|nam|co|trong|lien quan|du an nao|project nao|tai lieu|file).*$/i, '').trim();
+        
+        // Trích xuất text gốc (có dấu) từ query
+        // Tìm vị trí của extracted text trong normalized query
+        const extractedIndex = normalized.indexOf(extracted);
+        if (extractedIndex !== -1) {
+          const originalExtracted = query.substring(extractedIndex, extractedIndex + extracted.length);
+          console.log('[RAG] Extracted task name:', originalExtracted);
+          return originalExtracted;
+        }
         
         console.log('[RAG] Extracted task name:', extracted);
         return extracted;

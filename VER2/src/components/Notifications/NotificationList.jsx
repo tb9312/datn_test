@@ -9,7 +9,6 @@ import {
   Typography,
   Spin,
   Alert,
-  notification as antdNotification,
   Row,
   Col
 } from 'antd';
@@ -44,36 +43,36 @@ const NotificationList = ({ onClose }) => {
 
   const getNotificationIcon = (type) => {
     const icons = {
-      task: <CheckCircleOutlined style={{ color: '#1890ff' }} />,
-      system: <MessageOutlined style={{ color: '#722ed1' }} />,
-      comment: <MessageOutlined style={{ color: '#52c41a' }} />,
-      chat: <MessageOutlined style={{ color: '#eb2f96' }} />,
-      project: <TeamOutlined style={{ color: '#52c41a' }} />,
-      deadline: <ClockCircleOutlined style={{ color: '#faad14' }} />,
-      urgent: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-      meeting: <TeamOutlined style={{ color: '#eb2f96' }} />,
-      create_project: <TeamOutlined style={{ color: '#52c41a' }} />,
-      project_update: <TeamOutlined style={{ color: '#1890ff' }} />,
-      project_delete: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+      TASK: <CheckCircleOutlined style={{ color: '#1890ff' }} />,
+      PROJECT: <TeamOutlined style={{ color: '#52c41a' }} />,
+      CREATE_PROJECT: <TeamOutlined style={{ color: '#52c41a' }} />,
+      SYSTEM: <MessageOutlined style={{ color: '#722ed1' }} />,
+      COMMENT: <MessageOutlined style={{ color: '#52c41a' }} />,
+      CHAT: <MessageOutlined style={{ color: '#eb2f96' }} />,
+      DEADLINE: <ClockCircleOutlined style={{ color: '#faad14' }} />,
+      URGENT: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
+      MEETING: <TeamOutlined style={{ color: '#eb2f96' }} />,
+      PROJECT_UPDATE: <TeamOutlined style={{ color: '#1890ff' }} />,
+      PROJECT_DELETE: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
     };
-    return icons[type?.toLowerCase()] || <MessageOutlined />;
+    return icons[type] || <MessageOutlined />;
   };
 
   const getNotificationColor = (type) => {
     const colors = {
-      task: 'blue',
-      system: 'purple',
-      comment: 'green',
-      chat: 'pink',
-      project: 'green',
-      deadline: 'orange',
-      urgent: 'red',
-      meeting: 'cyan',
-      create_project: 'green',
-      project_update: 'blue',
-      project_delete: 'red'
+      TASK: 'blue',
+      PROJECT: 'green',
+      CREATE_PROJECT: 'green',
+      SYSTEM: 'purple',
+      COMMENT: 'green',
+      CHAT: 'pink',
+      DEADLINE: 'orange',
+      URGENT: 'red',
+      MEETING: 'cyan',
+      PROJECT_UPDATE: 'blue',
+      PROJECT_DELETE: 'red'
     };
-    return colors[type?.toLowerCase()] || 'default';
+    return colors[type] || 'default';
   };
 
   const formatTime = (timestamp) => {
@@ -113,7 +112,7 @@ const NotificationList = ({ onClose }) => {
         navigate(notification.url);
       }
     } catch (error) {
-      // Error đã được handle trong context
+      console.error("Error handling notification click:", error);
     }
   };
 
@@ -121,7 +120,7 @@ const NotificationList = ({ onClose }) => {
     try {
       await markAllAsRead();
     } catch (error) {
-      // Error đã được handle trong context
+      console.error("Error marking all as read:", error);
     }
   };
 
@@ -134,7 +133,7 @@ const NotificationList = ({ onClose }) => {
       background: 'white', 
       borderRadius: 8, 
       width: 400,
-      maxWidth: '90vw' // Responsive cho mobile
+      maxWidth: '90vw' 
     }}>
       {/* Header */}
       <div style={{ 
@@ -147,25 +146,25 @@ const NotificationList = ({ onClose }) => {
         <Title level={5} style={{ margin: 0 }}>Thông báo</Title>
         <Space>
           {loading && <Spin size="small" />}
-          {error && (
-            <Button 
-              type="link" 
-              size="small" 
-              icon={<ReloadOutlined />}
-              onClick={handleRetry}
-              title="Thử lại"
-            />
-          )}
-          {!loading && !error && unreadCount > 0 && (
+          {!loading && unreadCount > 0 && (
             <Button 
               type="link" 
               size="small" 
               onClick={handleMarkAllAsRead}
               style={{ padding: 0, fontSize: 12 }}
+              loading={loading}
             >
               Đánh dấu tất cả đã đọc
             </Button>
           )}
+          <Button 
+            type="link" 
+            size="small" 
+            icon={<ReloadOutlined />}
+            onClick={handleRetry}
+            title="Tải lại"
+            loading={loading}
+          />
         </Space>
       </div>
 
@@ -191,6 +190,11 @@ const NotificationList = ({ onClose }) => {
                 </Button>
               }
             />
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <Text type="secondary">
+                Đang hiển thị {notifications.length} thông báo đã tải trước đó
+              </Text>
+            </div>
           </div>
         ) : notifications.length === 0 ? (
           <Empty
@@ -263,7 +267,7 @@ const NotificationList = ({ onClose }) => {
                             size="small"
                             style={{ fontSize: 10, margin: 0 }}
                           >
-                            {item.type || 'system'}
+                            {item.type}
                           </Tag>
                         </Col>
                       </Row>
@@ -299,7 +303,8 @@ const NotificationList = ({ onClose }) => {
                               size="small"
                               style={{ fontSize: 9, margin: 0 }}
                             >
-                              {item.priority}
+                              {item.priority === 'high' ? 'Cao' : 
+                               item.priority === 'medium' ? 'Trung bình' : 'Thấp'}
                             </Tag>
                           </Col>
                         )}
@@ -314,7 +319,7 @@ const NotificationList = ({ onClose }) => {
       </div>
 
       {/* Footer */}
-      {!loading && !error && (
+     {!loading && !error && notifications.length > 0 && (
         <>
           <Divider style={{ margin: 0 }} />
           <div style={{ 
@@ -325,7 +330,7 @@ const NotificationList = ({ onClose }) => {
             borderBottomRightRadius: 8
           }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {notifications.length} thông báo • {unreadCount} chưa đọc
+              Hiển thị {notifications.length} thông báo • {unreadCount} chưa đọc
             </Text>
           </div>
         </>

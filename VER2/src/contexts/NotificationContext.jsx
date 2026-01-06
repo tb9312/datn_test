@@ -4,10 +4,10 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { notification as antdNotification } from "antd";
 import { notificationService } from "../services/notificationService";
-import { io } from "socket.io-client";
 
 const NotificationContext = createContext();
 
@@ -26,188 +26,264 @@ export const NotificationProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [socket, setSocket] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const pollingIntervalRef = useRef(null);
+  const isMountedRef = useRef(true); // Để kiểm tra component còn mount không
 
-  // Fetch notifications từ API thực
-  const fetchNotifications = useCallback(
-    async (showNotification = false) => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await notificationService.getNotifications();
-
-        console.log("📢 Notification API Response:", response);
-
-        if (response.code === 200 && response.data) {
-          // Format notifications theo cấu trúc backend
-          const notificationsData = Array.isArray(response.data)
-            ? response.data
-            : [];
-
-          const formattedNotifications = notificationsData.map((noti) => ({
-            _id: noti._id,
-            title: noti.title,
-            message: noti.message,
-            type: noti.type,
-            isRead: noti.isRead,
-            read: noti.isRead,
-            url: noti.url,
-            createdAt: noti.createdAt,
-            priority: noti.priority,
-            sender: noti.sender,
-          }));
-
-          console.log("📢 Formatted notifications:", formattedNotifications);
-
-          // Kiểm tra xem có thông báo mới không
-          const previousUnreadCount = unreadCount;
-          const newUnreadCount = formattedNotifications.filter(
-            (n) => !n.isRead
-          ).length;
-
-          setNotifications(formattedNotifications);
-          setUnreadCount(newUnreadCount);
-
-          // Hiển thị notification nếu có thông báo mới
-          if (showNotification && newUnreadCount > previousUnreadCount) {
-            const newNotifications = formattedNotifications.filter(
-              (n) => !n.isRead
-            );
-            const latestNotification = newNotifications[0];
-
-            if (latestNotification) {
-              antdNotification.info({
-                message: latestNotification.title,
-                description: latestNotification.message,
-                duration: 4,
-                onClick: () => {
-                  markAsRead(latestNotification._id);
-                  if (latestNotification.url) {
-                    window.location.href = latestNotification.url;
-                  }
-                },
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error("❌ Failed to fetch notifications:", error);
-        setError(error.message);
-
-        antdNotification.error({
-          message: "Lỗi tải thông báo",
-          description: error.message,
-          duration: 3,
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [unreadCount]
-  );
-
-  // Khởi tạo WebSocket connection
-  useEffect(() => {
-    const token =
-      localStorage.getItem("token") || sessionStorage.getItem("token");
-
-    if (token && !socket) {
-      const newSocket = io("http://localhost:3370", {
-        auth: {
-          token: token,
-        },
-        transports: ["websocket", "polling"],
-      });
-
-      newSocket.on("connect", () => {
-        console.log("🔌 WebSocket connected");
-      });
-
-      newSocket.on("new-notification", (notification) => {
-        console.log("🔔 New notification via WebSocket:", notification);
-
-        // Thêm thông báo mới vào đầu danh sách
-        setNotifications((prev) => [
-          {
-            _id: notification._id,
-            title: notification.title,
-            message: notification.message,
-            type: notification.type,
-            isRead: false,
-            read: false,
-            url: notification.url,
-            createdAt: notification.createdAt,
-            priority: notification.priority,
-            sender: notification.sender,
-          },
-          ...prev,
-        ]);
-
-        // Tăng unread count
-        setUnreadCount((prev) => prev + 1);
-
-        // Hiển thị browser notification
-        if (Notification.permission === "granted") {
-          new Notification(notification.title, {
-            body: notification.message,
-            icon: "/favicon.ico",
-          });
-        }
-
-        // Hiển thị antd notification
-        antdNotification.info({
-          message: notification.title,
-          description: notification.message,
-          duration: 4,
-          onClick: () => {
-            markAsRead(notification._id);
-            if (notification.url) {
-              window.location.href = notification.url;
-            }
-          },
-        });
-      });
-
-      newSocket.on("disconnect", () => {
-        console.log("🔌 WebSocket disconnected");
-      });
-
-      setSocket(newSocket);
-
-      return () => {
-        newSocket.disconnect();
-      };
-    }
+  // Kiểm tra authentication state - DÙNG ĐÚNG KEY "tokenLogin"
+  const checkAuth = useCallback(() => {
+    const token = localStorage.getItem('tokenLogin') || sessionStorage.getItem('tokenLogin');
+    const user = localStorage.getItem('user');
+    
+    const isAuth = !!token && !!user;
+    
+    console.log("🔐 Auth check:", { 
+      hasToken: !!token, 
+      hasUser: !!user, 
+      isAuthenticated: isAuth 
+    });
+    
+    return isAuth;
   }, []);
 
-  // Load notifications on mount và polling
-  // useEffect(() => {
-  //   fetchNotifications();
+  // Fetch notifications từ API - CHỈ KHI ĐÃ LOGIN
+  const fetchNotifications = useCallback(async (showNotification = false) => {
+    // Kiểm tra authentication trước
+    const auth = checkAuth();
+    if (!auth) {
+      console.log("⚠️ User not authenticated, skipping notification fetch");
+      if (isMountedRef.current) {
+        setNotifications([]);
+        setUnreadCount(0);
+        setError("Vui lòng đăng nhập để xem thông báo");
+        setIsAuthenticated(false);
+      }
+      return;
+    }
 
-  //   // Poll for new notifications every 10 seconds (nhanh hơn)
-  //   const interval = setInterval(() => {
-  //     fetchNotifications(true); // true = hiển thị notification khi có mới
-  //   }, 10000);
+    if (!isMountedRef.current) return;
 
-  //   return () => {
-  //     clearInterval(interval);
-  //   };
-  // }, [fetchNotifications]);
+    try {
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+        setIsAuthenticated(true);
+      }
+      
+      // Gọi API với pagination params
+      const params = {
+        page: 1,
+        limit: 50
+      };
+      
+      const response = await notificationService.getNotifications(params);
 
-  // Mark as read
+      console.log("📢 Notification API Response:", response);
+
+      if (!isMountedRef.current) return;
+
+      // Kiểm tra response structure
+      if (response && (response.success || response.code === 200)) {
+        const notificationsData = response.data || [];
+        
+        const formattedNotifications = notificationsData.map((noti) => ({
+          _id: noti._id,
+          title: noti.title,
+          message: noti.message,
+          type: noti.type,
+          isRead: noti.isRead,
+          url: noti.url,
+          createdAt: noti.createdAt,
+          priority: noti.priority,
+          sender: noti.sender,
+        }));
+
+        // Tính số notification chưa đọc
+        const newUnreadCount = formattedNotifications.filter(
+          (n) => !n.isRead
+        ).length;
+
+        console.log("📊 Notifications loaded:", {
+          total: formattedNotifications.length,
+          unread: newUnreadCount
+        });
+
+        if (isMountedRef.current) {
+          setNotifications(formattedNotifications);
+          setUnreadCount(newUnreadCount);
+          setIsAuthenticated(true);
+        }
+
+        // Hiển thị thông báo nếu có notification mới
+        if (showNotification && newUnreadCount > 0 && isMountedRef.current) {
+          const unreadNotifications = formattedNotifications.filter(n => !n.isRead);
+          const latestUnread = unreadNotifications[0];
+          
+          if (latestUnread) {
+            antdNotification.info({
+              message: latestUnread.title,
+              description: latestUnread.message,
+              duration: 4,
+              onClick: () => {
+                if (latestUnread.url) {
+                  window.location.href = latestUnread.url;
+                }
+              },
+            });
+          }
+        }
+      } else {
+        throw new Error(response?.message || 'Lỗi tải thông báo');
+      }
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      
+      console.error("❌ Failed to fetch notifications:", error);
+      
+      // Kiểm tra nếu là lỗi authentication
+      if (error.message.includes('Authentication') || error.message.includes('401')) {
+        console.log("🔒 Authentication error, clearing auth state");
+        if (isMountedRef.current) {
+          setIsAuthenticated(false);
+          setNotifications([]);
+          setUnreadCount(0);
+          setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        }
+        
+        // Không hiển thị thông báo lỗi authentication
+        return;
+      }
+      
+      if (isMountedRef.current) {
+        setError(error.message || 'Lỗi tải thông báo');
+      }
+      
+      antdNotification.error({
+        message: "Lỗi tải thông báo",
+        description: error.message || 'Không thể kết nối đến server',
+        duration: 3,
+      });
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [checkAuth]);
+
+  // Setup polling - CHỈ KHI ĐÃ LOGIN
+  const setupPolling = useCallback(() => {
+    // Clear interval cũ nếu có
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
+    // Kiểm tra authentication
+    const auth = checkAuth();
+    if (!auth) {
+      console.log("⚠️ Not authenticated, skipping polling setup");
+      if (isMountedRef.current) {
+        setIsAuthenticated(false);
+      }
+      return;
+    }
+
+    console.log("🔄 Setting up notification polling for authenticated user...");
+    
+    if (isMountedRef.current) {
+      setIsAuthenticated(true);
+    }
+
+    // Polling: kiểm tra thông báo mới mỗi 60 giây
+    pollingIntervalRef.current = setInterval(() => {
+      if (isMountedRef.current) {
+        console.log("⏰ Polling check...");
+        fetchNotifications(true); // true = hiển thị notification khi có mới
+      }
+    }, 60000); // 60 giây
+
+    // Fetch ngay lần đầu
+    fetchNotifications();
+  }, [checkAuth, fetchNotifications]);
+
+  // Lắng nghe sự kiện login/logout từ AuthContext - FIX INFINITE LOOP
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    const handleAuthChange = () => {
+      if (!isMountedRef.current) return;
+      
+      const isNowAuthenticated = checkAuth();
+      console.log("🔄 Auth state changed:", isNowAuthenticated);
+      
+      if (isNowAuthenticated) {
+        // User vừa login - setup polling
+        setupPolling();
+      } else {
+        // User vừa logout - clear data và polling
+        setNotifications([]);
+        setUnreadCount(0);
+        setError("Vui lòng đăng nhập để xem thông báo");
+        setIsAuthenticated(false);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      }
+    };
+
+    // Kiểm tra auth ngay khi mount
+    handleAuthChange();
+
+    // Lắng nghe storage events (login/logout từ tab khác)
+    const handleStorageChange = (e) => {
+      if (e.key === 'tokenLogin' || e.key === 'user') {
+        handleAuthChange();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Cleanup khi unmount
+    return () => {
+      isMountedRef.current = false;
+      window.removeEventListener('storage', handleStorageChange);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [checkAuth, setupPolling]); // ĐỪNG THÊM fetchNotifications vào dependencies
+
+  // Mark as read - CHỈ KHI ĐÃ LOGIN
   const markAsRead = async (notificationId) => {
+    if (!checkAuth()) {
+      antdNotification.warning({
+        message: "Vui lòng đăng nhập",
+        duration: 2,
+      });
+      return;
+    }
+
     try {
       const result = await notificationService.markAsRead(notificationId);
 
-      if (result.code === 200) {
-        setNotifications((prev) =>
-          prev.map((noti) =>
-            noti._id === notificationId
-              ? { ...noti, isRead: true, read: true }
-              : noti
-          )
-        );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
+      if (result?.code === 200 || result?.success) {
+        if (isMountedRef.current) {
+          setNotifications((prev) =>
+            prev.map((noti) =>
+              noti._id === notificationId
+                ? { ...noti, isRead: true }
+                : noti
+            )
+          );
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        }
+        
+        antdNotification.success({
+          message: "Đã đánh dấu đã đọc",
+          duration: 2,
+        });
       }
     } catch (error) {
       console.error("Failed to mark as read:", error);
@@ -219,35 +295,35 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Mark all as read
+  // Mark all as read - CHỈ KHI ĐÃ LOGIN
   const markAllAsRead = async () => {
-    try {
-      const unreadNotifications = notifications.filter((n) => !n.isRead);
-
-      if (unreadNotifications.length === 0) {
-        antdNotification.info({
-          message: "Không có thông báo chưa đọc",
-          duration: 2,
-        });
-        return;
-      }
-
-      // Gọi API markAsRead cho từng notification chưa đọc
-      const promises = unreadNotifications.map((noti) =>
-        notificationService.markAsRead(noti._id)
-      );
-
-      await Promise.all(promises);
-
-      setNotifications((prev) =>
-        prev.map((noti) => ({ ...noti, isRead: true, read: true }))
-      );
-      setUnreadCount(0);
-
-      antdNotification.success({
-        message: `Đã đánh dấu ${unreadNotifications.length} thông báo là đã đọc`,
+    if (!checkAuth()) {
+      antdNotification.warning({
+        message: "Vui lòng đăng nhập",
         duration: 2,
       });
+      return;
+    }
+
+    try {
+      const result = await notificationService.markAllAsRead();
+      
+      if (result?.success) {
+        if (isMountedRef.current) {
+          setNotifications((prev) =>
+            prev.map((noti) => ({ ...noti, isRead: true }))
+          );
+          setUnreadCount(0);
+        }
+
+        antdNotification.success({
+          message: result.message || 'Đã đánh dấu tất cả thông báo là đã đọc',
+          duration: 2,
+        });
+        
+        // Refresh lại danh sách
+        fetchNotifications();
+      }
     } catch (error) {
       console.error("Failed to mark all as read:", error);
       antdNotification.error({
@@ -258,23 +334,31 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Delete notification
+  // Delete notification - CHỈ KHI ĐÃ LOGIN
   const deleteNotification = async (notificationId) => {
-    try {
-      const result = await notificationService.deleteNotification(
-        notificationId
-      );
+    if (!checkAuth()) {
+      antdNotification.warning({
+        message: "Vui lòng đăng nhập",
+        duration: 2,
+      });
+      return;
+    }
 
-      if (result.code === 200) {
+    try {
+      const result = await notificationService.deleteNotification(notificationId);
+
+      if (result?.code === 200 || result?.success) {
         const deletedNoti = notifications.find((n) => n._id === notificationId);
 
-        setNotifications((prev) =>
-          prev.filter((noti) => noti._id !== notificationId)
-        );
+        if (isMountedRef.current) {
+          setNotifications((prev) =>
+            prev.filter((noti) => noti._id !== notificationId)
+          );
 
-        // Update unread count if notification was unread
-        if (deletedNoti && !deletedNoti.isRead) {
-          setUnreadCount((prev) => Math.max(0, prev - 1));
+          // Update unread count if notification was unread
+          if (deletedNoti && !deletedNoti.isRead) {
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+          }
         }
 
         antdNotification.success({
@@ -292,49 +376,16 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Request push permission
-  const requestPushPermission = async () => {
-    if (!("Notification" in window)) {
-      antdNotification.warning({
-        message: "Trình duyệt không hỗ trợ Push Notifications",
-      });
-      return false;
-    }
-
-    if (Notification.permission === "granted") {
-      return true;
-    }
-
-    if (Notification.permission === "denied") {
-      antdNotification.warning({
-        message:
-          "Bạn đã từ chối quyền thông báo. Vui lòng cấp quyền trong cài đặt trình duyệt.",
-      });
-      return false;
-    }
-
-    const permission = await Notification.requestPermission();
-
-    if (permission === "granted") {
-      antdNotification.success({
-        message: "Push Notifications đã được kích hoạt!",
-      });
-      return true;
-    }
-
-    return false;
-  };
-
   const value = {
     notifications,
     unreadCount,
     loading,
     error,
+    isAuthenticated,
     fetchNotifications,
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    requestPushPermission,
   };
 
   return (

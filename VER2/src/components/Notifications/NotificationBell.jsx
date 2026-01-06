@@ -6,19 +6,23 @@ import { useNotifications } from '../../contexts/NotificationContext';
 
 const NotificationBell = () => {
   const [dropdownVisible, setDropdownVisible] = useState(false);
-  const { unreadCount, fetchNotifications, loading } = useNotifications();
+  const { unreadCount, fetchNotifications, loading, isAuthenticated } = useNotifications();
+
+  // Nếu chưa login, không hiển thị bell
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleBellClick = () => {
     const newVisible = !dropdownVisible;
     setDropdownVisible(newVisible);
     
-    // Luôn refresh khi mở dropdown
+    // Chỉ refresh khi mở dropdown và không đang loading
     if (newVisible && !loading) {
+      console.log("🔔 Opening dropdown, fetching notifications...");
       fetchNotifications();
     }
   };
-
-  console.log('🔔 NotificationBell: unreadCount =', unreadCount);
 
   const notificationDropdown = (
     <NotificationList 
@@ -36,7 +40,7 @@ const NotificationBell = () => {
       overlayStyle={{ 
         boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
         borderRadius: 8,
-        maxWidth: '90vw' // Responsive
+        maxWidth: '90vw'
       }}
     >
       <Tooltip title="Thông báo">

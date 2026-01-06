@@ -34,11 +34,17 @@ import { apiClientV1 } from './api';
 export const notificationService = {
   getNotifications: async (params = {}) => {
     const response = await apiClientV1.get('/notifications', { params });
+    // API trả về toàn bộ response object
     return response;
   },
 
   markAsRead: async (notificationId) => {
     const response = await apiClientV1.patch(`/notifications/isReaded/${notificationId}`);
+    return response;
+  },
+
+  markAllAsRead: async () => {
+    const response = await apiClientV1.patch('/notifications/allReaded');
     return response;
   },
 
