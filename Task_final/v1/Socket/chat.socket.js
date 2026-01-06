@@ -46,7 +46,12 @@ module.exports = (io) => {
 
   // ✅ 2. Xử lý các sự kiện sau khi kết nối thành công
   io.on('connection', (socket) => {
-    console.log('✅ Socket connected:', socket.id, ' - User:', socket.user?.fullName);
+    console.log(
+      "✅ Socket connected:",
+      socket.id,
+      " - User:",
+      socket.user?.fullName
+    );
 
     // Tham gia phòng chat của team
     socket.on('JOIN_ROOM', ({ roomId }) => {
@@ -77,7 +82,9 @@ module.exports = (io) => {
         let images = [];
         if (Array.isArray(data.images) && data.images.length > 0) {
           for (const imageBuffer of data.images) {
-            const link = await uploadToCloudinary.uploadToCloudinary(imageBuffer);
+            const link = await uploadToCloudinary.uploadToCloudinary(
+              imageBuffer
+            );
             images.push(link);
           }
         }

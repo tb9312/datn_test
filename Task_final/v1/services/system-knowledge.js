@@ -83,7 +83,7 @@ Sau đó bạn có thể đăng nhập bằng mật khẩu mới.`
    - Vào menu "Công việc" → "Cá Nhân" (cho task cá nhân)
    - Hoặc "Nhóm" (cho task nhóm)
 
-2. **Click nút "Tạo Công Việc"** hoặc "Tạo Công việc nhóm"
+2. **Click nút "Tạo Công Việc"** 
 
 3. **Điền thông tin task**:
    - **Tiêu đề**: Tên task (bắt buộc)
@@ -94,7 +94,7 @@ Sau đó bạn có thể đăng nhập bằng mật khẩu mới.`
    - **Thời gian kết thúc**: Deadline
    - **Tags**: Thẻ phân loại (nếu có)
 
-4. **Lưu**: Click "Lưu" hoặc "Tạo" để hoàn tất
+4. **Lưu**: Click "Tạo mới" để hoàn tất
 
 Task sẽ xuất hiện trong danh sách và bạn có thể theo dõi tiến độ.`
       },

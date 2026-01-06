@@ -29,7 +29,7 @@ const RAGChatbot = ({ onClose }) => {
     {
       id: 1,
       type: 'bot',
-      content: 'Xin chào! 👋 Tôi là AI Assistant của hệ thống. Tôi có thể giúp bạn:\n\n📖 **Hướng dẫn sử dụng hệ thống**\n• Cách tạo task, project, team\n• Cách sử dụng các tính năng\n• Giải đáp thắc mắc về hệ thống\n\n💻 **Hỗ trợ kỹ thuật**\n• Tìm kiếm code và functions\n• Giải thích API endpoints\n• Phân tích cấu trúc hệ thống\n\n💡 **Ví dụ câu hỏi:**\n• "Làm sao để tạo task mới?"\n• "Tính năng nào có trong hệ thống?"\n• "Cách sử dụng calendar?"\n\nHãy hỏi tôi bất cứ điều gì!',
+      content: 'Xin chào! 👋 Tôi là AI Assistant của hệ thống. Tôi có thể giúp bạn:\n\n📖 **Hướng dẫn sử dụng hệ thống**\n• Cách sử dụng các tính năng\n• Giải đáp thắc mắc về hệ thống\n\n💡 **Ví dụ câu hỏi:**\n• "Làm sao để tạo task mới?"\n• "Tính năng nào có trong hệ thống?"\n• "Cách sử dụng calendar?"\n\nHãy hỏi tôi bất cứ điều gì!',
       timestamp: new Date(),
       sources: [],
     },

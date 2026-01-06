@@ -85,9 +85,10 @@ module.exports.index = async (req, res) => {
     $or: [
       { manager: req.user.id },
       { createdBy: req.user.id },
-      // { listUser: req.user.id },
+      { listUser: req.user.id },
     ],
     deleted: false,
+    projectParentId: { $exists: false }, // CHỈ lấy dự án không có parent
   };
   if (req.query.status) {
     find.status = req.query.status;

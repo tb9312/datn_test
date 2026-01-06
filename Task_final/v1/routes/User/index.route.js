@@ -9,15 +9,18 @@ const teamRoute = require("./team.route");
 const postRoute = require("./post.route");
 const notificationRoute = require("./notification.route");
 const calendarRouter = require("./calendar.route");
+const settingGeneral = require("./settingGeneral.route");
 const ragRoute = require("../rag.route");
 
 const authMiddleware = require("../../middlewares/User/auth.middlewares");
 const settingMiddleware = require("../../middlewares/User/setting.middleware");
 const userMiddleware = require("../../middlewares/User/user.middleware");
+
 module.exports = (app) => {
   const version = "/api/v1";
-  app.use(settingMiddleware.settingGeneral);
-  // app.use(userMiddleware.infoUser);
+
+  app.use(version + "/settingGeneral", settingGeneral);
+
   app.use(version + "/tasks", authMiddleware.requireAuth, taskRoute);
 
   app.use(version + "/poster", authMiddleware.requireAuth, postRoute);
