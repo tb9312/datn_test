@@ -38,6 +38,28 @@ const endpoints = {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const updateUser = (newUserData) => {
+    if (!newUserData) return;
+
+    // Merge với user hiện tại
+    const updatedUser = {
+      ...user,
+      ...newUserData,
+      // token: user.token || newUserData.token,
+      // _id: user._id || newUserData._id,
+      // id: user.id || newUserData.id,
+    };
+
+    // Cập nhật state
+    setUser(updatedUser);
+
+    // Cập nhật localStorage
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+
+    console.log("✅ User updated in context:", updatedUser);
+
+    return updatedUser;
+  };
   useEffect(() => {
     try {
       const token =
@@ -285,6 +307,7 @@ export const AuthProvider = ({ children }) => {
     hasPermission,
     isManager: () => checkIsManager(user?.role),
     getUserId: () => user?._id || user?.id,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

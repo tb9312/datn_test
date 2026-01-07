@@ -10,9 +10,17 @@ const projectSchema = new mongoose.Schema(
     timeFinish: Date,
     createdBy: String,
     deletedBy: String,
-    listUser: Array,
+    listUser: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     projectParentId: String,
-    tags: String,
+    statusHot: {
+      type: Boolean,
+      default: false,
+    },
     manager: String,
     deleted: {
       type: Boolean,

@@ -7,7 +7,7 @@ module.exports.requireAuth = async (req, res, next) => {
     let token = null;
     if (authHeader.startsWith("Bearer ")) {
       token = authHeader.slice(7).trim();
-      console.log("token", token);
+      //console.log("token", token);
     }
     if (!token) {
       return res
@@ -23,7 +23,7 @@ module.exports.requireAuth = async (req, res, next) => {
         .json({ success: false, message: "Invalid or expired token" });
     }
     const user = await User.findById(decoded.id).select("-password");
-    if (!user) {
+    if (!user || user.status == "inactive") {
       return res
         .status(401)
         .json({ success: false, message: "User not found" });

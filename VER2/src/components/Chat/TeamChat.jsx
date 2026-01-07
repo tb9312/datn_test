@@ -1,6 +1,22 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Card, Input, Button, Avatar, List, Space, Typography, Divider, Tooltip, message as antdMsg } from "antd";
-import { SendOutlined, UserOutlined, PaperClipOutlined, SmileOutlined } from "@ant-design/icons";
+import {
+  Card,
+  Input,
+  Button,
+  Avatar,
+  List,
+  Space,
+  Typography,
+  Divider,
+  Tooltip,
+  message as antdMsg,
+} from "antd";
+import {
+  SendOutlined,
+  UserOutlined,
+  PaperClipOutlined,
+  SmileOutlined,
+} from "@ant-design/icons";
 import io from "socket.io-client";
 
 const { TextArea } = Input;
@@ -30,12 +46,17 @@ const TeamChat = ({ team, currentUser, onClose }) => {
   // ✅ Load history từ backend (v1) - Đã sửa team.id -> team._id
   const fetchMessages = useCallback(async () => {
     try {
-      const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY);
+      const token =
+        localStorage.getItem(STORAGE_TOKEN_KEY) ||
+        sessionStorage.getItem(STORAGE_TOKEN_KEY);
       if (!token) return;
 
-      const res = await fetch(`${API_BASE}/api/v1/chat/history?teamId=${team._id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_BASE}/api/v1/chat/history?teamId=${team._id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (!res.ok) {
         const txt = await res.text();
@@ -64,7 +85,9 @@ const TeamChat = ({ team, currentUser, onClose }) => {
   }, [team._id]);
 
   useEffect(() => {
-   const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY);
+   const token = 
+    localStorage.getItem(STORAGE_TOKEN_KEY) || 
+    sessionStorage.getItem(STORAGE_TOKEN_KEY);
   console.log("🔑 Token gửi lên Socket:", token); // THÊM LOG NÀY
 
   const s = io(SOCKET_URL, {
@@ -119,20 +142,27 @@ const TeamChat = ({ team, currentUser, onClose }) => {
     });
 
     s.on("SERVER_RETURN_TYPING", (data) => {
-      if (!data?.userId || String(data.userId) === String(currentUser.id)) return;
+      if (!data?.userId || String(data.userId) === String(currentUser.id)) 
+        return;
 
       if (data.type === "typing") {
         setTypingUsers((prev) => {
-          const exists = prev.some((u) => String(u.userId) === String(data.userId));
+          const exists = prev.some(
+            (u) => String(u.userId) === String(data.userId)
+          );
           if (exists) return prev;
           return [...prev, { userId: data.userId, fullName: data.fullName }];
         });
 
         setTimeout(() => {
-          setTypingUsers((prev) => prev.filter((u) => String(u.userId) !== String(data.userId)));
+          setTypingUsers((prev) => 
+            prev.filter((u) => String(u.userId) !== String(data.userId))
+          );
         }, 3000);
       } else {
-        setTypingUsers((prev) => prev.filter((u) => String(u.userId) !== String(data.userId)));
+        setTypingUsers((prev) => 
+          prev.filter((u) => String(u.userId) !== String(data.userId))
+        );
       }
     });
 
@@ -240,12 +270,17 @@ const TeamChat = ({ team, currentUser, onClose }) => {
   };
 
   const formatTime = (ts) =>
-    new Date(ts).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    new Date(ts).toLocaleTimeString("vi-VN", {
+      hour: "2-digit", 
+      minute: "2-digit" 
+    });
 
   const renderMessageContent = (message) => (
     <div>
       {message.content && (
-        <div style={{ marginBottom: message.images?.length ? 8 : 0 }}>{message.content}</div>
+        <div style={{ marginBottom: message.images?.length ? 8 : 0 }}>
+          {message.content}
+        </div>
       )}
       {message.images?.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -280,8 +315,13 @@ const TeamChat = ({ team, currentUser, onClose }) => {
           Đóng
         </Button>
       }
-      style={{ height: 600, display: "flex", flexDirection: "column" }}
-      bodyStyle={{ flex: 1, display: "flex", flexDirection: "column", padding: 0 }}
+      style={{ display: "flex", flexDirection: "column" }}
+      bodyStyle={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        padding: 0,
+      }}
     >
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
         <List
@@ -292,7 +332,10 @@ const TeamChat = ({ team, currentUser, onClose }) => {
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
-                  flexDirection: String(m.sender.id) === String(currentUser.id) ? "row-reverse" : "row",
+                  flexDirection: 
+                    String(m.sender.id) === String(currentUser.id) 
+                      ? "row-reverse" 
+                      : "row",
                   width: "100%",
                 }}
               >
@@ -301,7 +344,10 @@ const TeamChat = ({ team, currentUser, onClose }) => {
                   src={m.sender.avatar}
                   icon={<UserOutlined />}
                   style={{
-                    margin: String(m.sender.id) === String(currentUser.id) ? "0 0 0 8px" : "0 8px 0 0",
+                    margin:
+                      String(m.sender.id) === String(currentUser.id)
+                        ? "0 0 0 8px"
+                        : "0 8px 0 0",
                   }}
                 />
                 <div
@@ -309,13 +355,22 @@ const TeamChat = ({ team, currentUser, onClose }) => {
                     maxWidth: "70%",
                     display: "flex",
                     flexDirection: "column",
-                    alignItems: String(m.sender.id) === String(currentUser.id) ? "flex-end" : "flex-start",
+                    alignItems:
+                      String(m.sender.id) === String(currentUser.id)
+                        ? "flex-end"
+                        : "flex-start",
                   }}
                 >
                   <div
                     style={{
-                      background: String(m.sender.id) === String(currentUser.id) ? "#1890ff" : "#f0f0f0",
-                      color: String(m.sender.id) === String(currentUser.id) ? "white" : "black",
+                      background:
+                        String(m.sender.id) === String(currentUser.id)
+                          ? "#1890ff"
+                          : "#f0f0f0",
+                      color:
+                        String(m.sender.id) === String(currentUser.id)
+                          ? "white"
+                          : "black",
                       padding: "8px 12px",
                       borderRadius: 12,
                       wordWrap: "break-word",
@@ -358,10 +413,27 @@ const TeamChat = ({ team, currentUser, onClose }) => {
           </Tooltip>
         </Space.Compact>
 
-        <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between" }}>
+        <div
+          style={{
+            marginTop: 8,
+            display: "flex",
+            justifyContent: "space-between",
+          }}
+        >
           <Space size="small">
-            <input type="file" id="file-upload" multiple style={{ display: "none" }} onChange={handleAttachment} />
-            <Button type="text" icon={<PaperClipOutlined />} size="small" onClick={() => document.getElementById("file-upload")?.click()}>
+            <input 
+              type="file" 
+              id="file-upload" 
+              multiple 
+              style={{ display: "none" }} 
+              onChange={handleAttachment} 
+            />
+            <Button 
+              type="text" 
+              icon={<PaperClipOutlined />} 
+              size="small" 
+              onClick={() => document.getElementById("file-upload")?.click()}
+            >
               Đính kèm
             </Button>
             <Button type="text" icon={<SmileOutlined />} size="small">

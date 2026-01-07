@@ -1,6 +1,6 @@
 // pages/Dashboard.jsx
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Progress, List, Tag, Spin, Alert, Button } from 'antd';
+import React, { useState, useEffect } from "react";
+import { Row, Col, Card, Progress, List, Tag, Spin, Alert, Button } from "antd";
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -8,16 +8,17 @@ import {
   RiseOutlined,
   ProjectOutlined,
   UserOutlined,
-  ReloadOutlined
-} from '@ant-design/icons';
-import StatCard from '../../components/Common/StatCard';
-import ChartCard from '../../components/Common/ChartCard';
-import { useAuth } from '../../contexts/AuthContext';
-import { dashboardService } from '../../services/dashboardService';
+  ReloadOutlined,
+} from "@ant-design/icons";
+import StatCard from "../../components/Common/StatCard";
+import ChartCard from "../../components/Common/ChartCard";
+import { useAuth } from "../../contexts/AuthContext";
+import { dashboardService } from "../../services/dashboardService";
+import PosterBell from "../../components/Article/SystemArticleMini";
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const userRole = user?.role || 'guest';
+  const userRole = user?.role || "guest";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
@@ -36,43 +37,42 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('🔍 Fetching dashboard data...');
-      
+
+      console.log("🔍 Fetching dashboard data...");
+
       const data = await dashboardService.getDashboardData();
-      console.log('✅ Dashboard data received:', data);
-      
+      console.log("✅ Dashboard data received:", data);
+
       setDashboardData(data);
-      
+
       // 1. Cập nhật stat cards
       const stats = dashboardService.getStatCardsData(data, userRole);
-      console.log('📊 Stat cards data:', stats);
+      console.log("📊 Stat cards data:", stats);
       updateStatCards(stats, userRole);
-        
+
       // 2. Cập nhật chart data
-      if (userRole === 'user' || userRole === 'USER') {
+      if (userRole === "user" || userRole === "USER") {
         const taskChart = dashboardService.getTaskDistributionData(data);
         setTaskChartData(taskChart);
       }
-      
+
       // FIX: Sử dụng dữ liệu thực từ API
       const projectChart = dashboardService.getProjectDistributionData(data);
-      console.log('📈 Project chart from service:', projectChart);
+      console.log("📈 Project chart from service:", projectChart);
       setProjectChartData(projectChart);
-      
+
       // 3. Cập nhật project progress (cho manager)
-      if (userRole === 'manager' || userRole === 'MANAGER') {
+      if (userRole === "manager" || userRole === "MANAGER") {
         const progressData = dashboardService.getProjectProgressData(data);
         setProjectProgress(progressData);
       }
-      
+
       // 4. Lấy dữ liệu mẫu
       setRecentActivities(dashboardService.getRecentActivities());
       setUpcomingDeadlines(dashboardService.getUpcomingDeadlines());
-      
     } catch (err) {
-      console.error('Error fetching dashboard:', err);
-      setError(err.message || 'Có lỗi xảy ra khi tải dữ liệu dashboard');
+      console.error("Error fetching dashboard:", err);
+      setError(err.message || "Có lỗi xảy ra khi tải dữ liệu dashboard");
     } finally {
       setLoading(false);
     }
@@ -80,73 +80,73 @@ const Dashboard = () => {
 
   const updateStatCards = (stats, role) => {
     let cards = [];
-    
-    if (role === 'user' || role === 'USER') {
+
+    if (role === "user" || role === "USER") {
       cards = [
         {
           title: "Total Tasks",
           value: stats.totalTasks || 0,
           icon: <CheckCircleOutlined />,
-          color: "#1890ff"
+          color: "#1890ff",
         },
         {
           title: "Pending",
           value: stats.pendingTasks || 0,
           icon: <ClockCircleOutlined />,
-          color: "#faad14"
+          color: "#faad14",
         },
         {
           title: "Team Tasks",
           value: stats.teamTasks || 0,
           icon: <TeamOutlined />,
-          color: "#52c41a"
+          color: "#52c41a",
         },
       ];
-    } else if (role === 'manager' || role === 'MANAGER') {
+    } else if (role === "manager" || role === "MANAGER") {
       cards = [
         {
           title: "Total Projects",
           value: stats.totalProjects || 0,
           icon: <ProjectOutlined />,
-          color: "#1890ff"
+          color: "#1890ff",
         },
         {
           title: "My Projects",
           value: stats.totalPM || 0,
           icon: <UserOutlined />,
-          color: "#13c2c2"
+          color: "#13c2c2",
         },
         {
           title: "Pending Projects",
           value: stats.pendingProjects || 0,
           icon: <ClockCircleOutlined />,
-          color: "#faad14"
+          color: "#faad14",
         },
         {
           title: "Team Projects",
           value: stats.teamProjects || 0,
           icon: <TeamOutlined />,
-          color: "#52c41a"
-        }
+          color: "#52c41a",
+        },
       ];
     }
-    
-    console.log('🎯 Stat cards to display:', cards);
+
+    console.log("🎯 Stat cards to display:", cards);
     setStatCards(cards);
   };
 
   const getActivityTag = (type) => {
     const colors = {
-      success: 'green',
-      info: 'blue',
-      warning: 'orange',
+      success: "green",
+      info: "blue",
+      warning: "orange",
     };
-    return colors[type] || 'default';
+    return colors[type] || "default";
   };
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '50px' }}>
+      <div style={{ textAlign: "center", padding: "50px" }}>
         <Spin size="large" />
         <p>Đang tải dữ liệu dashboard...</p>
       </div>
@@ -161,11 +161,11 @@ const Dashboard = () => {
         type="error"
         showIcon
         action={
-          <Button 
-            type="link" 
+          <Button
+            type="link"
             onClick={fetchDashboardData}
             icon={<ReloadOutlined />}
-            style={{ marginLeft: '10px' }}
+            style={{ marginLeft: "10px" }}
           >
             Thử lại
           </Button>
@@ -175,7 +175,8 @@ const Dashboard = () => {
   }
 
   return (
-    <div>
+    <div style={{ position: "relative" }}>
+      <PosterBell />
       {/* Statistics Cards */}
       <Row gutter={[24, 24]}>
         {statCards.map((card, index) => (
@@ -193,7 +194,7 @@ const Dashboard = () => {
       {/* Charts and Progress */}
       <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
         {/* Manager chỉ xem project chart */}
-        {(userRole === 'manager' || userRole === 'MANAGER') ? (
+        {userRole === "manager" || userRole === "MANAGER" ? (
           <>
             <Col xs={24} lg={16}>
               <ChartCard
@@ -204,7 +205,7 @@ const Dashboard = () => {
                 type="doughnut"
               />
             </Col>
-            
+
             {/* <Col xs={24} lg={8}>
               <Card title="Project Progress" bordered={false}>
                 {projectProgress.map((project, index) => (
@@ -238,7 +239,7 @@ const Dashboard = () => {
 
       {/* Recent Activities và Upcoming Deadlines */}
       <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
-        {(userRole === 'manager' || userRole === 'MANAGER') && (
+        {(userRole === "manager" || userRole === "MANAGER") && (
           <Col xs={24} lg={12}>
             <Card title="Recent Activities" bordered={false}>
               <List
@@ -254,16 +255,18 @@ const Dashboard = () => {
                         </div>
                       }
                       description={
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
-                          alignItems: 'center', 
-                          marginTop: 4 
-                        }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginTop: 4,
+                          }}
+                        >
                           <Tag color={getActivityTag(item.type)}>
                             {item.type.toUpperCase()}
                           </Tag>
-                          <span style={{ color: '#999', fontSize: 12 }}>
+                          <span style={{ color: "#999", fontSize: 12 }}>
                             {item.time}
                           </span>
                         </div>
@@ -275,8 +278,11 @@ const Dashboard = () => {
             </Card>
           </Col>
         )}
-        
-        <Col xs={24} lg={(userRole === 'manager' || userRole === 'MANAGER') ? 12 : 24}>
+
+        <Col
+          xs={24}
+          lg={userRole === "manager" || userRole === "MANAGER" ? 12 : 24}
+        >
           <Card title="Upcoming Deadlines" bordered={false}>
             <List
               dataSource={upcomingDeadlines}
@@ -285,9 +291,23 @@ const Dashboard = () => {
                   <List.Item.Meta
                     title={item.task}
                     description={
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
                         <span>{item.date}</span>
-                        <Tag color={item.priority === 'high' ? 'red' : item.priority === 'medium' ? 'orange' : 'blue'}>
+                        <Tag
+                          color={
+                            item.priority === "high"
+                              ? "red"
+                              : item.priority === "medium"
+                              ? "orange"
+                              : "blue"
+                          }
+                        >
                           {item.priority}
                         </Tag>
                       </div>
@@ -299,8 +319,6 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
-      
-      
     </div>
   );
 };

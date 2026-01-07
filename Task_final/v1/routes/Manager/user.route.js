@@ -12,4 +12,6 @@ route.get("/detail", authMiddleware.requireAuth, controller.detail);
 
 route.get("/listuser", authMiddleware.requireAuth, controller.listuser);
 
+route.get("/listuser_hot", authMiddleware.requireAuth, controller.listuserHot);
+
 module.exports = route;

@@ -3,6 +3,9 @@ const PagitationHelper = require("../../../helpers/pagitation");
 const SearchHelper = require("../../../helpers/search");
 const Notification = require("../../../models/notification.model");
 const { updateOverdueTasks } = require("../../../helpers/updateOverdue");
+const {
+  calculateTaskScore,
+} = require("../../../helpers/ranking/taskScore.helper");
 
 //[GET]/api/v1/tasks
 module.exports.index = async (req, res) => {
@@ -24,7 +27,7 @@ module.exports.index = async (req, res) => {
     const keyword = (req.query.keyword || req.query.search || "")
       .toString()
       .trim();
-    console.log("Search keyword received:", keyword);
+    // console.log("Search keyword received:", keyword);
     if (keyword) {
       const regex = new RegExp(keyword, "i");
       find.$or = [{ title: regex }, { content: regex }];
@@ -326,35 +329,36 @@ module.exports.delete = async (req, res) => {
   }
 };
 
-// [GET] /api/v1/tasks/suggestSchedule
-module.exports.suggestSchedule = async (req, res) => {
+// [GET] /api/v1/tasks/suggest-task
+module.exports.suggestTask = async (req, res) => {
   try {
-    const userId = req.user?.id || req.query.userId;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+    const userId = req.user.id;
 
     const tasks = await Task.find({
       createdBy: userId,
       deleted: false,
       status: { $ne: "done" },
+    }).lean(); // QUAN TRỌNG cho performance
+
+    const tasksWithScore = tasks.map((task) => {
+      const score = calculateTaskScore(task);
+      return {
+        ...task,
+        smartScore: score,
+      };
     });
 
-    const schedule = suggestSchedule(tasks);
+    tasksWithScore.sort((a, b) => b.smartScore - a.smartScore);
 
-    return res.json({
-      success: true,
-      totalTasks: tasks.length,
-      schedule,
+    res.status(200).json({
+      message: "Smart sorted tasks",
+      total: tasksWithScore.length,
+      data: tasksWithScore,
     });
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message,
+  } catch (error) {
+    console.error("smartSortTasks error:", error);
+    res.status(500).json({
+      message: "Failed to smart sort tasks",
     });
   }
 };

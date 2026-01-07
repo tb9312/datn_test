@@ -6,8 +6,8 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -15,7 +15,7 @@ body {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
 
@@ -118,4 +118,162 @@ body.dark-mode {
 
 .dark-mode .ant-form-item-label > label {
   color: #d9d9d9 !important;
+}
+
+/* footer */
+/* NỀN */
+.app-footer-light {
+  background: #ffffff;
+  padding: 40px 24px 20px;
+  border-top: 3px solid #1677ff;
+}
+
+/* BRAND */
+.footer-brand {
+  color: #1677ff !important;
+  margin-bottom: 8px;
+}
+
+/* TIÊU ĐỀ */
+.footer-title {
+  color: #10239e !important;
+  margin-bottom: 8px;
+}
+
+/* NỘI DUNG */
+.footer-text {
+  color: #595959;
+  font-size: 14px;
+}
+
+.footer-desc {
+  color: #6b7280;
+}
+
+/* ICON */
+.footer-icon {
+  color: #1677ff;
+}
+
+/* LINK SOCIAL */
+.footer-link {
+  font-size: 22px;
+  color: #1677ff;
+  transition: all 0.25s ease;
+}
+
+.footer-link:hover {
+  color: #0958d9;
+  transform: translateY(-3px);
+}
+
+/* COPYRIGHT */
+.footer-copy {
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.app-sidebar {
+  background: #ffffff;
+  border-right: 1px solid #f0f0f0;
+}
+
+/* BRAND */
+.sidebar-brand {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sidebar-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.sidebar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1677ff;
+}
+
+/* USER */
+.sidebar-user {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sidebar-user.collapsed {
+  justify-content: center;
+}
+
+.sidebar-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.sidebar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* FALLBACK AVATAR */
+.avatar-fallback {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-fallback.admin {
+  background: #f5222d;
+}
+
+.avatar-fallback.manager {
+  background: #faad14;
+}
+
+.avatar-fallback.user {
+  background: #1677ff;
+}
+
+.sidebar-user-info .user-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+}
+
+.sidebar-user-info .user-role {
+  font-size: 12px;
+  color: #888;
+}
+
+/* MENU */
+.sidebar-menu {
+  border-right: none;
+  font-size: 15px;
+}
+
+.sidebar-menu .ant-menu-item {
+  height: 48px;
+}
+
+.sidebar-menu .ant-menu-item-selected {
+  font-weight: 600;
 }

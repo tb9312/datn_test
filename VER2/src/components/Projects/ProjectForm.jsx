@@ -1,25 +1,25 @@
 // components/Projects/ProjectForm.jsx
-import React, { useEffect, useState } from 'react';
-import { 
-  Form, 
-  Input, 
-  Select, 
-  DatePicker, 
-  Button, 
-  Space, 
-  Avatar, 
-  Row, 
-  Col, 
-  Upload, 
+import React, { useEffect, useState } from "react";
+import {
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  Button,
+  Space,
+  Avatar,
+  Row,
+  Col,
+  Upload,
   message,
   Spin,
   Typography,
   Tag,
-  Alert
-} from 'antd';
-import { 
-  UserOutlined, 
-  UploadOutlined, 
+  Alert,
+} from "antd";
+import {
+  UserOutlined,
+  UploadOutlined,
   PlusOutlined,
   LoadingOutlined,
   ProjectOutlined,
@@ -27,31 +27,31 @@ import {
   TeamOutlined,
   CrownOutlined,
   InfoCircleOutlined,
-  CheckOutlined
-} from '@ant-design/icons';
-import dayjs from 'dayjs';
+  CheckOutlined,
+} from "@ant-design/icons";
+import dayjs from "dayjs";
 
 const { Option } = Select;
 const { TextArea } = Input;
 const { Text } = Typography;
 
-const ProjectForm = ({ 
-  visible, 
-  onCancel, 
-  onFinish, 
-  initialValues, 
-  loading, 
-  users = [], 
+const ProjectForm = ({
+  visible,
+  onCancel,
+  onFinish,
+  initialValues,
+  loading,
+  users = [],
   currentUser,
   isParentProject = true,
   autoAssignToCreator = true, // Thêm prop này để tự động assign người tạo là phụ trách
   isCreatingTask = false, // THÊM PROP MỚI: đang tạo công việc
-  parentProjectId = null // THÊM: ID dự án cha (cho task)
-  
+  parentProjectId = null, // THÊM: ID dự án cha (cho task)
+  customUserSelect = null,
 }) => {
   const [form] = Form.useForm();
   const [thumbnailFile, setThumbnailFile] = useState(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -61,16 +61,22 @@ const ProjectForm = ({
         setIsEditing(true);
         const formValues = {
           title: initialValues.title,
-          status: initialValues.status || 'not-started',
-          content: initialValues.content || '',
-          priority: initialValues.priority || 'medium',
-          timeStart: initialValues.timeStart ? dayjs(initialValues.timeStart) : null,
-          timeFinish: initialValues.timeFinish ? dayjs(initialValues.timeFinish) : null,
-          listUser: initialValues.listUser ? initialValues.listUser.map(u => u._id || u) : [],
+          status: initialValues.status || "not-started",
+          content: initialValues.content || "",
+          priority: initialValues.priority || "medium",
+          timeStart: initialValues.timeStart
+            ? dayjs(initialValues.timeStart)
+            : null,
+          timeFinish: initialValues.timeFinish
+            ? dayjs(initialValues.timeFinish)
+            : null,
+          listUser: initialValues.listUser
+            ? initialValues.listUser.map((u) => u._id || u)
+            : [],
         };
-        
+
         form.setFieldsValue(formValues);
-        
+
         // Set thumbnail URL nếu có
         if (initialValues.thumbnail) {
           setThumbnailUrl(initialValues.thumbnail);
@@ -79,26 +85,26 @@ const ProjectForm = ({
         setIsEditing(false);
         form.resetFields();
         setThumbnailFile(null);
-        setThumbnailUrl('');
-        
+        setThumbnailUrl("");
+
         // Set default values for new project
         const defaultValues = {
-          status: isCreatingTask ? 'not-started' : 'not-started',
-          priority: 'medium'
+          status: isCreatingTask ? "not-started" : "not-started",
+          priority: "medium",
         };
-        
+
         form.setFieldsValue(defaultValues);
       }
     }
   }, [visible, initialValues, form, isCreatingTask]);
 
   const handleFileChange = (info) => {
-    if (info.file.status === 'uploading') {
+    if (info.file.status === "uploading") {
       setUploading(true);
       return;
     }
-    
-    if (info.file.status === 'done') {
+
+    if (info.file.status === "done") {
       if (info.file.response && info.file.response.url) {
         setThumbnailUrl(info.file.response.url);
       } else {
@@ -108,25 +114,25 @@ const ProjectForm = ({
       }
       setUploading(false);
       message.success(`${info.file.name} upload thành công`);
-    } else if (info.file.status === 'error') {
+    } else if (info.file.status === "error") {
       setUploading(false);
       message.error(`${info.file.name} upload thất bại`);
     }
   };
 
   const beforeUpload = (file) => {
-    const isImage = file.type.startsWith('image/');
+    const isImage = file.type.startsWith("image/");
     if (!isImage) {
-      message.error('Chỉ được upload file ảnh (JPG, PNG, GIF)!');
+      message.error("Chỉ được upload file ảnh (JPG, PNG, GIF)!");
       return Upload.LIST_IGNORE;
     }
-    
+
     const isLt5M = file.size / 1024 / 1024 < 5;
     if (!isLt5M) {
-      message.error('Ảnh phải nhỏ hơn 5MB!');
+      message.error("Ảnh phải nhỏ hơn 5MB!");
       return Upload.LIST_IGNORE;
     }
-    
+
     return true;
   };
 
@@ -138,85 +144,87 @@ const ProjectForm = ({
       onSuccess({}, file);
     } catch (error) {
       onError(error);
-      message.error('Upload ảnh thất bại!');
+      message.error("Upload ảnh thất bại!");
     } finally {
       setUploading(false);
     }
   };
 
   const handleFinish = (values) => {
-  const formData = new FormData();
-  
-  console.log('=== DEBUG FORM VALUES ===');
-  console.log('All values:', values);
-  console.log('listUser specifically:', values.listUser);
-  console.log('listUser exists?', 'listUser' in values);
-  
-  // Thêm các field chính của dự án - CHỈNH SỬA CÁCH NÀY
-  Object.keys(values).forEach(key => {
-    const value = values[key];
-    console.log(`Processing ${key}:`, value, 'type:', typeof value);
-    
-    if (value !== undefined && value !== null && value !== '') {
-      if (key === 'timeStart' || key === 'timeFinish') {
-        formData.append(key, value.format('YYYY-MM-DD'));
-      } else if (key === 'listUser') {
-        // 🎯 QUAN TRỌNG: Xử lý đặc biệt cho listUser
-        if (Array.isArray(value) && value.length > 0) {
-          // Cách 1: Thử append từng user ID
-          value.forEach((userId, index) => {
-            formData.append(`listUser[${index}]`, userId);
-          });
-          console.log(`Added ${value.length} users to FormData`);
+    const formData = new FormData();
+
+    console.log("=== DEBUG FORM VALUES ===");
+    console.log("All values:", values);
+    console.log("listUser specifically:", values.listUser);
+    console.log("listUser exists?", "listUser" in values);
+
+    // Thêm các field chính của dự án - CHỈNH SỬA CÁCH NÀY
+    Object.keys(values).forEach((key) => {
+      const value = values[key];
+      console.log(`Processing ${key}:`, value, "type:", typeof value);
+
+      if (value !== undefined && value !== null && value !== "") {
+        if (key === "timeStart" || key === "timeFinish") {
+          formData.append(key, value.format("YYYY-MM-DD"));
+        } else if (key === "listUser") {
+          // 🎯 QUAN TRỌNG: Xử lý đặc biệt cho listUser
+          if (Array.isArray(value) && value.length > 0) {
+            // Cách 1: Thử append từng user ID
+            value.forEach((userId, index) => {
+              formData.append(`listUser[${index}]`, userId);
+            });
+            console.log(`Added ${value.length} users to FormData`);
+          } else {
+            console.log("listUser is empty or not array, skipping");
+          }
         } else {
-          console.log('listUser is empty or not array, skipping');
+          formData.append(key, value);
         }
-      } else {
-        formData.append(key, value);
       }
+    });
+
+    // Debug: Kiểm tra tất cả entries trong FormData
+    console.log("=== FORM DATA ENTRIES ===");
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}:`, value);
     }
-  });
-  
-  // Debug: Kiểm tra tất cả entries trong FormData
-  console.log('=== FORM DATA ENTRIES ===');
-  for (let [key, value] of formData.entries()) {
-    console.log(`${key}:`, value);
-  }
-  console.log('Total entries:', Array.from(formData.entries()).length);
-  
-  // QUAN TRỌNG: Người tạo dự án chính là người phụ trách
-  if (currentUser?.id) {
-    formData.append('assignee_id', currentUser.id);
-    formData.append('createdBy', currentUser.id);
-  }
-  
-  // Nếu đang tạo công việc (task), thêm projectParentId
-  if (isCreatingTask && parentProjectId) {
-    formData.append('projectParentId', parentProjectId);
-  }
-  
-  // Thêm thumbnail file nếu có
-  if (thumbnailFile) {
-    formData.append('thumbnail', thumbnailFile);
-  } else if (initialValues?.thumbnail && !thumbnailUrl.startsWith('blob:')) {
-    formData.append('thumbnail', initialValues.thumbnail);
-  }
-  
-  console.log('=== FINAL FORM DATA BEFORE SUBMIT ===');
-  for (let [key, value] of formData.entries()) {
-    console.log(`${key}:`, value);
-  }
-  
-  onFinish(formData);
-};
+    console.log("Total entries:", Array.from(formData.entries()).length);
+
+    // QUAN TRỌNG: Người tạo dự án chính là người phụ trách
+    if (currentUser?.id) {
+      formData.append("assignee_id", currentUser.id);
+      formData.append("createdBy", currentUser.id);
+    }
+
+    // Nếu đang tạo công việc (task), thêm projectParentId
+    if (isCreatingTask && parentProjectId) {
+      formData.append("projectParentId", parentProjectId);
+    }
+
+    // Thêm thumbnail file nếu có
+    if (thumbnailFile) {
+      formData.append("thumbnail", thumbnailFile);
+    } else if (initialValues?.thumbnail && !thumbnailUrl.startsWith("blob:")) {
+      formData.append("thumbnail", initialValues.thumbnail);
+    }
+
+    console.log("=== FINAL FORM DATA BEFORE SUBMIT ===");
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}:`, value);
+    }
+
+    onFinish(formData);
+  };
 
   // Validation cho timeFinish không được trước timeStart
   const validateDates = (_, value) => {
-    const timeStart = form.getFieldValue('timeStart');
-    
+    const timeStart = form.getFieldValue("timeStart");
+
     if (timeStart && value) {
-      if (value.isBefore(timeStart, 'day')) {
-        return Promise.reject(new Error('Hạn hoàn thành không được trước ngày bắt đầu!'));
+      if (value.isBefore(timeStart, "day")) {
+        return Promise.reject(
+          new Error("Hạn hoàn thành không được trước ngày bắt đầu!")
+        );
       }
     }
     return Promise.resolve();
@@ -253,10 +261,19 @@ const ProjectForm = ({
           <Form.Item
             name="title"
             label={isCreatingTask ? "Tên công việc" : "Tên dự án"}
-            rules={[{ required: true, message: isCreatingTask ? 'Vui lòng nhập tên công việc!' : 'Vui lòng nhập tên dự án!' }]}
+            rules={[
+              {
+                required: true,
+                message: isCreatingTask
+                  ? "Vui lòng nhập tên công việc!"
+                  : "Vui lòng nhập tên dự án!",
+              },
+            ]}
           >
-            <Input 
-              placeholder={isCreatingTask ? "Nhập tên công việc..." : "Nhập tên dự án..."}  
+            <Input
+              placeholder={
+                isCreatingTask ? "Nhập tên công việc..." : "Nhập tên dự án..."
+              }
               size="large"
             />
           </Form.Item>
@@ -270,12 +287,19 @@ const ProjectForm = ({
             name="content"
             label={isCreatingTask ? "Mô tả công việc" : "Mô tả dự án"}
             rules={[
-              { required: !isCreatingTask, message: 'Vui lòng nhập mô tả dự án!' }
+              {
+                required: !isCreatingTask,
+                message: "Vui lòng nhập mô tả dự án!",
+              },
             ]}
           >
-            <TextArea 
-              rows={3} 
-              placeholder={isCreatingTask ? "Mô tả chi tiết về công việc..." : "Mô tả chi tiết về dự án..."}
+            <TextArea
+              rows={3}
+              placeholder={
+                isCreatingTask
+                  ? "Mô tả chi tiết về công việc..."
+                  : "Mô tả chi tiết về dự án..."
+              }
             />
           </Form.Item>
         </Col>
@@ -287,28 +311,33 @@ const ProjectForm = ({
           <Form.Item
             name="status"
             label="Trạng thái"
-            rules={[{ required: !isCreatingTask, message: 'Vui lòng chọn trạng thái!' }]}
+            rules={[
+              {
+                required: !isCreatingTask,
+                message: "Vui lòng chọn trạng thái!",
+              },
+            ]}
           >
-            <Select 
+            <Select
               placeholder="Chọn trạng thái"
               size="large"
               suffixIcon={<ProjectOutlined />}
               disabled={isCreatingTask && !isEditing} // Disable cho task mới
             >
               <Option value="not-started">
-                <span style={{ color: '#fa8c16' }}>Chưa bắt đầu</span>
+                <span style={{ color: "#fa8c16" }}>Chưa bắt đầu</span>
               </Option>
               <Option value="in-progress">
-                <span style={{ color: '#1890ff' }}>Đang thực hiện</span>
+                <span style={{ color: "#1890ff" }}>Đang thực hiện</span>
               </Option>
               <Option value="on-hold">
-                <span style={{ color: '#722ed1' }}>Tạm dừng</span>
+                <span style={{ color: "#722ed1" }}>Tạm dừng</span>
               </Option>
               <Option value="completed">
-                <span style={{ color: '#52c41a' }}>Hoàn thành</span>
+                <span style={{ color: "#52c41a" }}>Hoàn thành</span>
               </Option>
               <Option value="cancelled">
-                <span style={{ color: '#f5222d' }}>Đã hủy</span>
+                <span style={{ color: "#f5222d" }}>Đã hủy</span>
               </Option>
             </Select>
           </Form.Item>
@@ -317,20 +346,17 @@ const ProjectForm = ({
           <Form.Item
             name="priority"
             label="Độ ưu tiên"
-            rules={[{ required: true, message: 'Vui lòng chọn độ ưu tiên!' }]}
+            rules={[{ required: true, message: "Vui lòng chọn độ ưu tiên!" }]}
           >
-            <Select 
-              placeholder="Chọn độ ưu tiên"
-              size="large"
-            >
+            <Select placeholder="Chọn độ ưu tiên" size="large">
               <Option value="low">
-                <span style={{ color: '#52c41a' }}>Thấp</span>
+                <span style={{ color: "#52c41a" }}>Thấp</span>
               </Option>
               <Option value="medium">
-                <span style={{ color: '#faad14' }}>Trung bình</span>
+                <span style={{ color: "#faad14" }}>Trung bình</span>
               </Option>
               <Option value="high">
-                <span style={{ color: '#f5222d' }}>Cao</span>
+                <span style={{ color: "#f5222d" }}>Cao</span>
               </Option>
             </Select>
           </Form.Item>
@@ -394,10 +420,10 @@ const ProjectForm = ({
           <Form.Item
             name="timeStart"
             label="Ngày bắt đầu"
-            rules={[{ required: true, message: 'Vui lòng chọn ngày bắt đầu!' }]}
+            rules={[{ required: true, message: "Vui lòng chọn ngày bắt đầu!" }]}
           >
-            <DatePicker 
-              style={{ width: '100%' }}
+            <DatePicker
+              style={{ width: "100%" }}
               format="DD/MM/YYYY"
               placeholder="Chọn ngày bắt đầu"
               size="large"
@@ -411,8 +437,8 @@ const ProjectForm = ({
             label="Hạn hoàn thành"
             rules={[{ validator: validateDates }]}
           >
-            <DatePicker 
-              style={{ width: '100%' }}
+            <DatePicker
+              style={{ width: "100%" }}
               format="DD/MM/YYYY"
               placeholder="Chọn hạn hoàn thành"
               size="large"
@@ -427,7 +453,7 @@ const ProjectForm = ({
         <Row gutter={16}>
           <Col span={24}>
             <Form.Item label="Ảnh thumbnail">
-              <div style={{ textAlign: 'center' }}>
+              <div style={{ textAlign: "center" }}>
                 <Upload
                   name="thumbnail"
                   listType="picture-card"
@@ -439,42 +465,54 @@ const ProjectForm = ({
                   disabled={uploading || loading}
                 >
                   {thumbnailUrl ? (
-                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                      <img 
-                        src={thumbnailUrl} 
-                        alt="Thumbnail" 
-                        style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'cover',
-                          borderRadius: '6px'
-                        }} 
+                    <div
+                      style={{
+                        position: "relative",
+                        width: "100%",
+                        height: "100%",
+                      }}
+                    >
+                      <img
+                        src={thumbnailUrl}
+                        alt="Thumbnail"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          borderRadius: "6px",
+                        }}
                       />
                       {uploading && (
-                        <div style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          background: 'rgba(0,0,0,0.5)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '6px'
-                        }}>
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: "rgba(0,0,0,0.5)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: "6px",
+                          }}
+                        >
                           <Spin />
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center' }}>
-                      {uploading ? <LoadingOutlined /> : <UploadOutlined style={{ fontSize: '24px' }} />}
+                    <div style={{ textAlign: "center" }}>
+                      {uploading ? (
+                        <LoadingOutlined />
+                      ) : (
+                        <UploadOutlined style={{ fontSize: "24px" }} />
+                      )}
                       <div style={{ marginTop: 8 }}>Click để upload ảnh</div>
                     </div>
                   )}
                 </Upload>
-                <div style={{ marginTop: 8, fontSize: '12px', color: '#999' }}>
+                <div style={{ marginTop: 8, fontSize: "12px", color: "#999" }}>
                   Hỗ trợ: JPG, PNG, GIF • Tối đa: 5MB • Tỷ lệ khuyến nghị: 16:9
                 </div>
               </div>
@@ -491,43 +529,52 @@ const ProjectForm = ({
             label="Thành viên tham gia"
             valuePropName="value" // Thêm dòng này
           >
-            <Select
-              mode="multiple"
-              placeholder="Chọn thành viên tham gia dự án"
-              optionFilterProp="children"
-              showSearch
-              allowClear
-              size="large"
-              maxTagCount={3}
-              maxTagTextLength={15}
-              suffixIcon={<TeamOutlined />}
-              filterOption={(input, option) =>
-                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
-              onChange={(value) => {
-                console.log('Select onChange - listUser selected:', value);
-                form.setFieldValue('listUser', value);
-              }}
-            >
-              {users
-                .filter(u => currentUser && u._id !== currentUser.id)
-                .map(user => (
-                  <Option key={user._id} value={user._id}>
-                    <Space>
-                      <Avatar 
-                        size="small" 
-                        src={user.avatar} 
-                        icon={<UserOutlined />} 
-                        style={{ backgroundColor: user.avatar ? 'transparent' : '#1890ff' }}
-                      />
-                      <span>{user.fullName}</span>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
-                        ({user.email})
-                      </Text>
-                    </Space>
-                  </Option>
-                ))}
-            </Select>
+            {customUserSelect ? (
+              customUserSelect
+            ) : (
+              <Select
+                mode="multiple"
+                placeholder="Chọn thành viên tham gia dự án"
+                optionFilterProp="children"
+                showSearch
+                allowClear
+                size="large"
+                maxTagCount={3}
+                maxTagTextLength={15}
+                suffixIcon={<TeamOutlined />}
+                filterOption={(input, option) =>
+                  option.children.toLowerCase().indexOf(input.toLowerCase()) >=
+                  0
+                }
+                onChange={(value) => {
+                  console.log("Select onChange - listUser selected:", value);
+                  form.setFieldValue("listUser", value);
+                }}
+              >
+                {users
+                  .filter((u) => currentUser && u._id !== currentUser.id)
+                  .map((user) => (
+                    <Option key={user._id} value={user._id}>
+                      <Space>
+                        <Avatar
+                          size="small"
+                          src={user.avatar}
+                          icon={<UserOutlined />}
+                          style={{
+                            backgroundColor: user.avatar
+                              ? "transparent"
+                              : "#1890ff",
+                          }}
+                        />
+                        <span>{user.fullName}</span>
+                        <Text type="secondary" style={{ fontSize: "12px" }}>
+                          ({user.email})
+                        </Text>
+                      </Space>
+                    </Option>
+                  ))}
+              </Select>
+            )}
           </Form.Item>
         </Col>
       </Row>
@@ -581,30 +628,32 @@ const ProjectForm = ({
       )} */}
 
       {/* Buttons */}
-      <Form.Item style={{ marginTop: '32px', marginBottom: 0 }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          paddingTop: '16px',
-          borderTop: '1px solid #f0f0f0'
-        }}>
-          <Button 
-            onClick={onCancel} 
+      <Form.Item style={{ marginTop: "32px", marginBottom: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            paddingTop: "16px",
+            borderTop: "1px solid #f0f0f0",
+          }}
+        >
+          <Button
+            onClick={onCancel}
             disabled={loading}
             size="large"
-            style={{ minWidth: '120px' }}
+            style={{ minWidth: "120px" }}
           >
             Hủy bỏ
           </Button>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
+          <Button
+            type="primary"
+            htmlType="submit"
             loading={loading}
             size="large"
-            style={{ minWidth: '150px' }}
+            style={{ minWidth: "150px" }}
             icon={!isEditing && <PlusOutlined />}
           >
-            {isEditing ? 'Cập nhật dự án' : 'Tạo dự án mới'}
+            {isEditing ? "Cập nhật dự án" : "Tạo dự án mới"}
           </Button>
         </div>
       </Form.Item>

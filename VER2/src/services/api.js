@@ -27,16 +27,20 @@ export const API_CONFIG = {
       EDIT: "/tasks/edit",
       CHANGE_STATUS: "/tasks/change-status",
       DELETE: "/tasks/delete",
+      SUGGEST: "/tasks/suggest-task",
     },
 
     // Project endpoints (không cần /api/v1 prefix vì apiClientV1 đã có baseURL)
     PROJECTS: {
       LIST: "/projects",
+      HOT_LIST: "/projects/hotproject",
       DETAIL: "/projects/detail",
       CREATE: "/projects/create",
+      CREATE_HOT: "/projects/create_hot",
       EDIT: "/projects/edit",
       CHANGE_STATUS: "/projects/change-status",
       DELETE: "/projects/delete",
+      REFUSE: "/projects/refuse/:id",
     },
     CALENDAR: {
       LIST: "/calendars",

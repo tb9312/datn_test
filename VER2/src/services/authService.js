@@ -111,7 +111,7 @@ const authService = {
         requestData = formData;
         headers = { "Content-Type": "multipart/form-data" };
       }
-
+      console.log("📤 Sending update data:", updateData); // Debug
       const response = await apiClient.patch("/users/edit", requestData, {
         headers,
       });
@@ -123,10 +123,30 @@ const authService = {
         };
       }
 
+      // 🔥 TẠO USER DATA MỚI ĐỂ TRẢ VỀ
+      const updatedUser = {
+        ...user, // Giữ thông tin cũ
+        fullName: updateData.fullName || user.fullName,
+        email: updateData.email || user.email,
+        phone: updateData.phone || user.phone,
+        position_job: updateData.position_job || user.position_job,
+        // Nếu response có avatar thì dùng
+        avatar: response.avatar || user.avatar,
+        // Giữ các trường quan trọng
+        _id: user._id,
+        id: user.id,
+        token: user.token,
+        role: user.role,
+      };
+
+      // 🔥 CẬP NHẬT LOCALSTORAGE NGAY
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
       return {
         success: true,
-        data: response,
-        message: response.message,
+        data: updatedUser, // 🔥 Trả về user mới
+        message: response.message || "Cập nhật thành công",
+        response: response,
       };
     } catch (error) {
       return {

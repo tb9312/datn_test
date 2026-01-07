@@ -6,6 +6,8 @@ const upload = multer();
 const controller = require("../../controllers/Manager/project.controller");
 
 route.get("/", controller.index);
+
+// route.get("/hotproject", controller.indexHot);
 // Them chi tiet SubProject
 route.get("/:parentId/tasks", controller.getTasksByParent);
 

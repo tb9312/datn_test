@@ -601,7 +601,61 @@ class RAGService {
       return 'reports';
     }
 
-    // PRIORITY 7: General / Overview
+    // PRIORITY 7: Greeting - Chào hỏi
+    if (
+      normalized === 'xin chao' ||
+      normalized === 'chao' ||
+      normalized === 'chao ban' ||
+      normalized === 'hello' ||
+      normalized === 'hi' ||
+      normalized === 'hey' ||
+      normalized === 'he lo' ||
+      normalized.startsWith('xin chao') ||
+      normalized.startsWith('chao ') ||
+      normalized.startsWith('hello') ||
+      normalized.startsWith('hi ') ||
+      normalized.startsWith('chao buoi') ||
+      normalized.includes('chao buoi sang') ||
+      normalized.includes('chao buoi chieu') ||
+      normalized.includes('chao buoi toi') ||
+      normalized.includes('good morning') ||
+      normalized.includes('good afternoon') ||
+      normalized.includes('good evening')
+    ) {
+      return 'greeting';
+    }
+
+    // PRIORITY 8: Small Talk - Trò chuyện xã giao
+    if (
+      normalized.includes('khoe khong') ||
+      normalized.includes('the nao') ||
+      normalized.includes('co khoe') ||
+      normalized.includes('how are you') ||
+      normalized.includes('ban la ai') ||
+      normalized.includes('ai la ban') ||
+      normalized.includes('who are you') ||
+      normalized.includes('gioi thieu') ||
+      normalized.includes('ban giup gi') ||
+      normalized.includes('ban giup duoc gi') ||
+      normalized.includes('ban lam duoc gi') ||
+      normalized.includes('ban lam gi') ||
+      normalized.includes('ban co the') ||
+      normalized.includes('cam on') ||
+      normalized.includes('thank you') ||
+      normalized.includes('thanks') ||
+      normalized.includes('cam on ban') ||
+      normalized.includes('tam biet') ||
+      normalized.includes('bye') ||
+      normalized.includes('goodbye') ||
+      normalized.includes('hen gap lai') ||
+      normalized.includes('rat vui') ||
+      normalized.includes('tot qua') ||
+      normalized.includes('tuyet voi')
+    ) {
+      return 'small_talk';
+    }
+
+    // PRIORITY 9: General / Overview
     if (
       normalized.includes('he thong') ||
       normalized.includes('system') ||
@@ -909,6 +963,28 @@ class RAGService {
     // MANAGER được phép xem personal_task (vì họ cũng là thành viên có task riêng)
     // CHỈ chặn calendar và reports nếu cần (hiện tại không chặn)
 
+    // 2.8. Greeting - Chào hỏi
+    if (intent === 'greeting') {
+      const answer = this.generateGreetingAnswer(userId);
+      return {
+        answer,
+        sources: [],
+        context: [],
+        isGreeting: true
+      };
+    }
+
+    // 2.9. Small Talk - Trò chuyện xã giao
+    if (intent === 'small_talk') {
+      const answer = this.generateSmallTalkAnswer(userQuery);
+      return {
+        answer,
+        sources: [],
+        context: [],
+        isSmallTalk: true
+      };
+    }
+
     // 3. Route theo intent (sau khi đã check quyền)
     if (intent === 'user_guide' || intent === 'general') {
       // Knowledge RAG
@@ -992,11 +1068,24 @@ class RAGService {
         // Xử lý daily plan
         if (queryType === 'daily_plan') {
           // Trích xuất số ngày từ query
-          const daysMatch = userQuery.match(/(\d+)\s*(ngày|ngay|day)/i);
-          const numDays = daysMatch ? parseInt(daysMatch[1]) : 1; // Mặc định 1 ngày (ngày mai)
+          // Pattern 1: "X ngày trong/của/từ Y ngày" (random selection)
+          const rangeMatch = userQuery.match(/(\d+)\s*ng[aà]y\s+(?:trong|cua|tu|t\u1eeb)\s+(\d+)\s*ng[aà]y/i);
+          
+          let workDays, totalDays;
+          if (rangeMatch) {
+            // "3 ngày trong 7 ngày" hoặc "3 ngày của 7 ngày" -> workDays=3, totalDays=7
+            workDays = parseInt(rangeMatch[1]);
+            totalDays = parseInt(rangeMatch[2]);
+          } else {
+            // Pattern 2: "N ngày" (consecutive days)
+            const daysMatch = userQuery.match(/(\d+)\s*(ngày|ngay|day)/i);
+            const numDays = daysMatch ? parseInt(daysMatch[1]) : 1;
+            workDays = numDays;
+            totalDays = numDays;
+          }
           
           // Gọi hàm lập kế hoạch tùy chỉnh
-          answer = this.generateCustomPlanAnswer(userQuery, analysis, numDays);
+          answer = this.generateCustomPlanAnswer(userQuery, analysis, workDays, totalDays);
         } 
         // Xử lý priority query
         else if (queryType === 'priority') {
@@ -1862,11 +1951,19 @@ class RAGService {
   /**
    * Tạo kế hoạch tùy chỉnh cho N ngày tới (sắp xếp theo priority trước, deadline sau)
    */
-  generateCustomPlanAnswer(query, analysis, numDays = 1) {
+  generateCustomPlanAnswer(query, analysis, workDays = 1, totalDays = null) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + numDays);
+    
+    // Nếu không truyền totalDays, mặc định bằng workDays (liên tục)
+    if (totalDays === null) {
+      totalDays = workDays;
+    }
+    
+    // Validate input
+    if (workDays > totalDays) {
+      return `⚠️ **Lỗi**: Không thể lập kế hoạch ${workDays} ngày làm việc trong ${totalDays} ngày!`;
+    }
 
     // Lọc task chưa hoàn thành trong khoảng thời gian
     const relevantTasks = analysis.allTasks.filter(task => {
@@ -1917,6 +2014,27 @@ class RAGService {
       return getDeadlineValue(a) - getDeadlineValue(b); // Deadline gần lên trước
     });
 
+    // Chọn ngày làm việc
+    let selectedDays = [];
+    if (workDays === totalDays) {
+      // Liên tục: ngày 1, 2, 3, ..., workDays
+      for (let i = 0; i < workDays; i++) {
+        selectedDays.push(i);
+      }
+    } else {
+      // Random: chọn workDays ngày từ totalDays ngày
+      const allDays = Array.from({ length: totalDays }, (_, i) => i);
+      
+      // Fisher-Yates shuffle
+      for (let i = allDays.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allDays[i], allDays[j]] = [allDays[j], allDays[i]];
+      }
+      
+      // Lấy workDays ngày đầu tiên và sắp xếp theo thứ tự
+      selectedDays = allDays.slice(0, workDays).sort((a, b) => a - b);
+    }
+
     // Tạo lịch làm việc với time slots cụ thể (không chồng chéo)
     // Mỗi task 6 tiếng, nghỉ 1 tiếng giữa các task
     const workHours = [
@@ -1925,15 +2043,15 @@ class RAGService {
     ];
 
     const schedule = [];
-    let currentDay = 0;
+    let dayIndex = 0;
     let slotIndex = 0;
 
     // Phân bổ tasks vào các time slots
     sortedTasks.forEach((task) => {
-      if (currentDay >= numDays) return; // Đã hết số ngày quy hoạch
+      if (dayIndex >= selectedDays.length) return; // Đã hết số ngày quy hoạch
 
       const workDate = new Date(today);
-      workDate.setDate(workDate.getDate() + currentDay + 1); // +1 để bắt đầu từ ngày mai
+      workDate.setDate(workDate.getDate() + selectedDays[dayIndex] + 1); // +1 để bắt đầu từ ngày mai
 
       const slot = workHours[slotIndex];
       const formatted = taskSuggestionHelper.formatTaskForDisplay(task);
@@ -1950,14 +2068,19 @@ class RAGService {
       slotIndex++;
       if (slotIndex >= workHours.length) {
         slotIndex = 0;
-        currentDay++;
+        dayIndex++;
       }
     });
 
     // Tạo câu trả lời với lịch chi tiết
-    const dateRange = numDays === 1 
-      ? `ngày mai (${new Date(today.getTime() + 24*60*60*1000).toLocaleDateString('vi-VN')})` 
-      : `${numDays} ngày tới`;
+    let dateRange;
+    if (workDays === 1) {
+      dateRange = `ngày mai (${new Date(today.getTime() + 24*60*60*1000).toLocaleDateString('vi-VN')})`;
+    } else if (workDays === totalDays) {
+      dateRange = `${workDays} ngày tới`;
+    } else {
+      dateRange = `${workDays} ngày trong ${totalDays} ngày tới`;
+    }
     
     let answer = `📅 **Kế hoạch làm việc chi tiết cho ${dateRange}:**\n\n`;
 
@@ -1987,6 +2110,91 @@ class RAGService {
     }
 
     return answer;
+  }
+
+  /**
+   * Generate greeting response
+   */
+  generateGreetingAnswer(userId) {
+    const greetings = [
+      "Xin chào! 😊 Tôi là AI Assistant của hệ thống quản lý công việc.",
+      "Chào bạn! 👋 Rất vui được gặp bạn.",
+      "Hello! 🙌 Tôi là trợ lý AI, sẵn sàng hỗ trợ bạn.",
+    ];
+    
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+    
+    return `${greeting}\n\nTôi có thể giúp bạn:\n\n` +
+           `📋 **Quản lý công việc**\n` +
+           `• Xem task hôm nay, sắp deadline\n` +
+           `• Lập kế hoạch làm việc\n` +
+           `• Gợi ý ưu tiên công việc\n\n` +
+           `🔍 **Tra cứu thông tin**\n` +
+           `• Thông tin chi tiết về task, dự án\n` +
+           `• Tiến độ công việc của bạn\n\n` +
+           `💡 **Ví dụ câu hỏi:**\n` +
+           `• "Hôm nay tôi cần làm gì?"\n` +
+           `• "Lập kế hoạch 3 ngày tới"\n` +
+           `• "Thông tin task [tên task]"\n\n` +
+           `Hãy hỏi tôi bất cứ điều gì bạn cần! 🚀`;
+  }
+
+  /**
+   * Generate small talk response
+   */
+  generateSmallTalkAnswer(query) {
+    const normalized = this.normalizeQuery(query);
+    
+    // Khỏe không / How are you
+    if (normalized.includes('khoe khong') || normalized.includes('the nao') || normalized.includes('how are you')) {
+      return "Tôi rất tốt, cảm ơn bạn! 😊\n";
+    }
+    
+    // Bạn là ai / Who are you
+    if (normalized.includes('ban la ai') || normalized.includes('ai la ban') || normalized.includes('who are you') || normalized.includes('gioi thieu')) {
+      return "Tôi là **AI Assistant** - trợ lý thông minh của hệ thống quản lý công việc! 🤖\n\n" +
+             "Tôi được thiết kế để giúp bạn:\n" +
+             "• Quản lý và theo dõi công việc\n" +
+             "• Lập kế hoạch làm việc hiệu quả\n" +
+             "• Tra cứu thông tin về task và dự án\n" +
+             "• Gợi ý ưu tiên công việc dựa trên deadline\n\n" ;
+    }
+    
+    // Cảm ơn / Thanks
+    if (normalized.includes('cam on') || normalized.includes('thank')) {
+      return "Rất vui được giúp đỡ bạn! 😊\n\nNếu bạn cần bất kỳ hỗ trợ nào khác về công việc, đừng ngại hỏi tôi nhé!";
+    }
+    
+    // Tạm biệt / Goodbye
+    if (normalized.includes('tam biet') || normalized.includes('bye') || normalized.includes('goodbye')) {
+      return "Tạm biệt! 👋\n\nChúc bạn làm việc hiệu quả! Hẹn gặp lại bạn sớm. 😊";
+    }
+    
+    // Khen ngợi
+    if (normalized.includes('rat vui') || normalized.includes('tot qua') || normalized.includes('tuyet voi')) {
+      return "Cảm ơn bạn! 🥰\n\nTôi rất vui khi có thể giúp ích cho bạn. Nếu cần thêm hỗ trợ gì, cứ cho tôi biết nhé!";
+    }
+    
+    // Bạn có thể / Bạn giúp gì / Bạn giúp được gì
+    if (
+      normalized.includes('ban co the') || 
+      normalized.includes('ban giup') ||  // Bao gồm cả "ban giup gi", "ban giup duoc gi"
+      normalized.includes('giup gi') ||
+      normalized.includes('giup duoc gi')
+    ) {
+      return "Tôi có thể giúp bạn rất nhiều việc! 💪\n\n" +
+             "📋 **Quản lý công việc:**\n" +
+             "• Xem danh sách task chưa hoàn thành\n" +
+             "• Kiểm tra task sắp deadline\n" +
+             "• Lập kế hoạch làm việc cho nhiều ngày\n\n" +
+             "🔍 **Tra cứu thông tin:**\n" +
+             "• Chi tiết về task cụ thể\n" +
+             "• Task thuộc dự án nào\n" +
+             "• Tiến độ công việc\n\n" ;
+    }
+    
+    // Default small talk response
+    return "😊 Cảm ơn bạn đã trò chuyện với tôi!\n\nTôi là AI Assistant chuyên hỗ trợ quản lý công việc. Nếu bạn cần giúp đỡ về task, dự án, hay lập kế hoạch làm việc, hãy hỏi tôi nhé!";
   }
 
   /**

@@ -13,8 +13,6 @@ const settingGeneral = require("./settingGeneral.route");
 const ragRoute = require("../rag.route");
 
 const authMiddleware = require("../../middlewares/User/auth.middlewares");
-const settingMiddleware = require("../../middlewares/User/setting.middleware");
-const userMiddleware = require("../../middlewares/User/user.middleware");
 
 module.exports = (app) => {
   const version = "/api/v1";

@@ -1,4 +1,5 @@
 const Poster = require("../../../models/article.model");
+const Format = require("../../../helpers/format");
 //[GET]/api/v1/poster.
 module.exports.index = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ module.exports.index = async (req, res) => {
     return res.json({
       code: 200,
       message: "success",
-      poster,
+      data: poster,
     });
   } catch (error) {
     console.error("LỖI KHI LẤY POSTER:", error);

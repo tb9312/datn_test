@@ -27,8 +27,8 @@ class SocketService {
 
     this.socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
-      auth: { token },          // ✅ server đọc socket.handshake.auth.token
-      query: { userId },        // optional
+      auth: { token }, // ✅ server đọc socket.handshake.auth.token
+      query: { userId }, // optional
       withCredentials: true,
     });
 
@@ -65,17 +65,22 @@ class SocketService {
 
   joinTeam(teamId) {
     if (!this.socket) return;
-    this.socket.emit("JOIN_ROOM", { teamId });     // ✅ match backend mới
+    this.socket.emit("JOIN_ROOM", { teamId }); // ✅ match backend mới
   }
 
   leaveTeam(teamId) {
     if (!this.socket) return;
-    this.socket.emit("LEAVE_ROOM", { teamId });    // ✅ match backend mới
+    this.socket.emit("LEAVE_ROOM", { teamId }); // ✅ match backend mới
   }
 
   sendMessage({ teamId, content, images = [], tempId }) {
     if (!this.socket) return;
-    this.socket.emit("CLIENT_SEND_MESSAGE", { teamId, content, images, tempId });
+    this.socket.emit("CLIENT_SEND_MESSAGE", {
+      teamId,
+      content,
+      images,
+      tempId,
+    });
   }
 
   sendTyping({ teamId, type }) {
@@ -83,11 +88,21 @@ class SocketService {
     this.socket.emit("CLIENT_SEND_TYPING", { teamId, type });
   }
 
-  onNewMessage(cb) { this.listeners.newMessage.push(cb); }
-  onTyping(cb) { this.listeners.typing.push(cb); }
-  onConnected(cb) { this.listeners.connected.push(cb); }
-  onDisconnected(cb) { this.listeners.disconnected.push(cb); }
-  onError(cb) { this.listeners.error.push(cb); }
+  onNewMessage(cb) {
+    this.listeners.newMessage.push(cb);
+  }
+  onTyping(cb) {
+    this.listeners.typing.push(cb);
+  }
+  onConnected(cb) {
+    this.listeners.connected.push(cb);
+  }
+  onDisconnected(cb) {
+    this.listeners.disconnected.push(cb);
+  }
+  onError(cb) {
+    this.listeners.error.push(cb);
+  }
 
   disconnect() {
     if (this.socket) {

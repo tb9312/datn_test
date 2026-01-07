@@ -13,8 +13,12 @@ const taskSchema = new mongoose.Schema(
       trim: true,
     },
 
-    status: String,
-
+    status: {
+      type: String,
+      enum: ["backlog", "in-progress", "todo", "done"],
+      default: "todo",
+      index: true,
+    },
     priority: {
       type: String,
       enum: ["low", "medium", "high"],
@@ -40,15 +44,6 @@ const taskSchema = new mongoose.Schema(
       min: 0.25,
       max: 24,
     },
-
-    tags: [
-      {
-        type: String,
-        trim: true,
-        lowercase: true,
-        index: true,
-      },
-    ],
     createdBy: String,
     deleted: {
       type: Boolean,

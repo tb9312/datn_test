@@ -1,56 +1,51 @@
 const md5 = require("md5");
+const rankingConfig = require("../../config/user.ranking.config");
 
 const generateHelper = require("../../../helpers/generate");
+const calculateSkillScore = require("../../../helpers/ranking/calculateSkillScore.helper");
+const getCompletionRateByUsers = require("../../../helpers/ranking/getCompletionRateByUsers.helper");
+const getBacklogByUsers = require("../../../helpers/ranking/getBacklogByUsers.helper");
 // const sendMailHelper = require("../../helpers/send-mail");
-
+const SKILL_SCORE_MAP = {
+  beginner: 50,
+  intermediate: 75,
+  expert: 100,
+};
 const User = require("../../../models/user.model");
 const ForgotPassword = require("../../../models/forgot-password.model");
 
 //[POST] /api/v3/users/login
 module.exports.login = async (req, res) => {
   try {
-    const email = req.body.email;
-    const password = req.body.password;
-    const user = await User.findOne({
-      email: email,
-      deleted: false,
-      role: "MANAGER",
-    });
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email, deleted: false });
     if (!user) {
-      res.json({
-        code: 400,
-        message: "Dang nhap khong thanh cong",
-      });
-      return;
+      return res.status(400).json({ message: "Email không tồn tại" });
     }
-    // console(email);
-    // console(password);
+
     if (md5(password) !== user.password) {
-      res.json({
-        code: 404,
-        message: "sai mat khau",
-      });
-      return;
+      return res.status(401).json({ message: "Sai mật khẩu" });
     }
-    const userInfo = {
-      _id: user._id, // ← ID THẬT TỪ DATABASE
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role || "MANAGER",
-    };
-    const token = user.token;
-    res.cookie("token", token);
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role || "user" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
     res.json({
-      code: 200,
-      message: "Dang nhap thanh cong",
-      token: token,
-      user: userInfo,
+      message: "Đăng nhập thành công",
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        token: token,
+      },
     });
-  } catch (error) {
-    res.json({
-      code: 404,
-      message: "Dang nhap khong thanh cong",
-    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -104,4 +99,83 @@ module.exports.listuser = async (req, res) => {
     message: "Thành công",
     users: users,
   });
+};
+//[GET] /api/v3/users/listuser_hot
+module.exports.listuserHot = async (req, res) => {
+  try {
+    // 1. (Optional) phân quyền
+    if (req.user && req.user.role !== "MANAGER") {
+      return res.status(403).json({
+        success: false,
+        message: "Permission denied",
+      });
+    }
+
+    // 2. Lấy danh sách user
+    const users = await User.find({ deleted: false }).lean();
+    const userIds = users.map((u) => u._id);
+
+    // 3. Lấy completion & backlog
+    const completionMap = await getCompletionRateByUsers(userIds);
+    const backlogMap = await getBacklogByUsers(userIds);
+
+    // 4. Chấm điểm
+    const rankedUsers = users.map((user) => {
+      // console.log(user.skills);
+      // Skill score từ STRING
+      const skillScore = SKILL_SCORE_MAP[user.skills] || 0;
+
+      const completionRate = completionMap[user._id.toString()]?.rate || 0;
+
+      const backlogCount = backlogMap[user._id.toString()] || 0;
+
+      const backlogPenalty = Math.min(
+        backlogCount * rankingConfig.BACKLOG_PENALTY.PER_TASK,
+        rankingConfig.BACKLOG_PENALTY.MAX
+      );
+
+      const finalScore =
+        skillScore * rankingConfig.WEIGHT.SKILL +
+        completionRate * rankingConfig.WEIGHT.COMPLETION -
+        backlogPenalty;
+
+      return {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        avatar: user.avatar,
+        role: user.role,
+
+        skills: user.skills,
+        skillScore,
+
+        completionRate: Math.round(completionRate),
+        backlogCount,
+        backlogPenalty,
+
+        finalScore: Math.max(0, Math.round(finalScore)),
+      };
+    });
+
+    // 5. Sắp xếp HOT → thấp
+    rankedUsers.sort((a, b) => b.finalScore - a.finalScore);
+
+    // 6. Response
+    return res.json({
+      success: true,
+      criteria: {
+        skill: "60%",
+        completion: "40%",
+        backlog: "penalty",
+      },
+      total: rankedUsers.length,
+      data: rankedUsers,
+    });
+  } catch (error) {
+    console.error("listuserHot error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
 };

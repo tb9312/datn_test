@@ -30,7 +30,7 @@ route.patch(
 
 route.patch("/delete/:id", controller.delete);
 
-route.get("/suggest-schedule", controller.suggestSchedule);
+route.get("/suggest-task", controller.suggestTask);
 
 route.patch("/priority/:id", controller.changePriority);
 

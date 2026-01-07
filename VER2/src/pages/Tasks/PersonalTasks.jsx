@@ -9,6 +9,10 @@ import {
   Row,
   Col,
   Tabs,
+  Tooltip,
+  Table,
+  Badge,
+  Tag,
   Card,
   Empty,
   Typography,
@@ -21,8 +25,14 @@ import {
 import {
   PlusOutlined,
   SearchOutlined,
+  StarOutlined,
   AppstoreOutlined,
   UnorderedListOutlined,
+  CalendarOutlined,
+  FlagOutlined,
+  EyeOutlined,
+  EditOutlined,
+  DeleteOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
 import TaskForm from "../../components/Tasks/TaskForm";
@@ -31,7 +41,7 @@ import TaskBoard from "../../components/Tasks/TaskBoard";
 import taskService from "../../services/taskService";
 import userService from "../../services/userService";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -50,6 +60,8 @@ const PersonalTasks = () => {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [smartSortTasks, setSmartSortTasks] = useState([]);
+const [smartSortLoading, setSmartSortLoading] = useState(false);
   
   // State cho phân trang (chỉ dùng cho list view)
   const [pagination, setPagination] = useState({
@@ -138,6 +150,31 @@ const PersonalTasks = () => {
     }
   };
 
+  // Load smart sort tasks
+const loadSmartSortTasks = async () => {
+  if (viewMode !== "smart-sort") return;
+  setSmartSortLoading(true);
+  try {
+    const params = {
+      keyword: searchText || undefined,
+      status: filterStatus !== "all" ? filterStatus : undefined,
+    };
+
+    const response = await taskService.getSuggestedTasks(params);
+    console.log("Smart Sort Response:", response);
+    
+    // SỬA: Đơn giản chỉ cần lấy response.data
+    setSmartSortTasks(response?.data || []);
+    
+  } catch (error) {
+    console.error("Error loading smart sort tasks:", error);
+    message.error(error.message || "Không thể tải danh sách công việc thông minh");
+    setSmartSortTasks([]);
+  } finally {
+    setSmartSortLoading(false);
+  }
+};
+
   // Load users
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -164,7 +201,11 @@ const PersonalTasks = () => {
     loadUsers();
     if (viewMode === "board") {
       loadBoardTasks();
-    } else {
+    }
+    else if (viewMode === "smart-sort") {
+    loadSmartSortTasks();
+    } 
+    else {
       loadTasks(1);
     }
   }, []);
@@ -173,8 +214,10 @@ const PersonalTasks = () => {
   useEffect(() => {
     if (viewMode === "board") {
       loadBoardTasks();
+    } else if (viewMode === "smart-sort") {
+    loadSmartSortTasks();
     } else {
-      loadTasks(1);
+    loadTasks(1);
     }
   }, [viewMode]);
 
@@ -182,6 +225,8 @@ const PersonalTasks = () => {
   useEffect(() => {
     if (viewMode === "board") {
       loadBoardTasks();
+    } else if (viewMode === "smart-sort") {
+    loadSmartSortTasks();
     } else {
       loadTasks(1);
     }
@@ -192,6 +237,8 @@ const PersonalTasks = () => {
     const delaySearch = setTimeout(() => {
       if (viewMode === "board") {
         loadBoardTasks();
+      }else if (viewMode === "smart-sort") {
+        loadSmartSortTasks();
       } else {
         loadTasks(1, searchText);
       }
@@ -224,6 +271,8 @@ const PersonalTasks = () => {
       // Reload dữ liệu
       if (viewMode === "board") {
         loadBoardTasks();
+      } else if (viewMode === "smart-sort") {
+        loadSmartSortTasks();
       } else {
         loadTasks(1); // Task mới sẽ ở đầu trang 1
       }
@@ -267,6 +316,8 @@ const PersonalTasks = () => {
       // Reload dữ liệu
       if (viewMode === "board") {
         loadBoardTasks();
+      } else if (viewMode === "smart-sort") {
+        loadSmartSortTasks();
       } else {
         loadTasks(pagination.current);
       }
@@ -293,6 +344,8 @@ const PersonalTasks = () => {
           // Reload dữ liệu
           if (viewMode === "board") {
             loadBoardTasks();
+          } else if (viewMode === "smart-sort") {
+            loadSmartSortTasks();
           } else {
             loadTasks(pagination.current);
           }
@@ -312,6 +365,8 @@ const PersonalTasks = () => {
       // Reload dữ liệu
       if (viewMode === "board") {
         loadBoardTasks();
+      } else if (viewMode === "smart-sort") {
+        loadSmartSortTasks();
       } else {
         loadTasks(pagination.current);
       }
@@ -362,6 +417,8 @@ const PersonalTasks = () => {
     loadUsers();
     if (viewMode === "board") {
       loadBoardTasks();
+    } else if (viewMode === "smart-sort") {
+      loadSmartSortTasks();
     } else {
       loadTasks(pagination.current);
     }
@@ -380,8 +437,181 @@ const PersonalTasks = () => {
       timeStart: task.timeStart || null,
       timeFinish: task.timeFinish || null,
       assignee: task.assignee || null,
+      smartScore: task.smartScore || 0,
     };
   };
+
+  // Các hàm helper
+  const getStatusColor = (status) => {
+    const colors = {
+      'todo': 'default',
+      'in-progress': 'blue',
+      'done': 'green',
+      'backlog': 'red'
+    };
+    return colors[status] || 'default';
+  };
+
+  const getStatusText = (status) => {
+    const texts = {
+      'todo': 'Chưa bắt đầu',
+      'in-progress': 'Đang thực hiện',
+      'done': 'Hoàn thành',
+      'backlog': 'Tồn đọng'
+    };
+    return texts[status] || status;
+  };
+
+  const getPriorityColor = (priority) => {
+    const colors = {
+      'low': 'green',
+      'medium': 'orange',
+      'high': 'red'
+    };
+    return colors[priority] || 'default';
+  };
+
+  const getPriorityText = (priority) => {
+    const texts = {
+      'low': 'Thấp',
+      'medium': 'Trung bình',
+      'high': 'Cao'
+    };
+    return texts[priority] || priority;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return null;
+    return new Date(dateString).toLocaleDateString('vi-VN');
+  };
+  // Columns cho Smart Sort Table
+  const smartSortColumns = [
+    {
+      title: '#',
+      dataIndex: 'index',
+      key: 'index',
+      width: 60,
+      render: (_, __, index) => (
+        <Badge 
+          count={index + 1}
+          style={{ 
+            backgroundColor: 
+              index < 3 ? '#ff4d4f' : 
+              index < 6 ? '#faad14' : 
+              '#52c41a'
+          }}
+        />
+      ),
+    },
+    {
+      title: 'Công việc',
+      dataIndex: 'title',
+      key: 'title',
+      render: (text, record) => (
+        <div>
+          <div style={{ fontWeight: 500, marginBottom: 4, fontSize: '14px' }}>
+            {text}
+          </div>
+          {record.content && (
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {record.content.length > 80 ? record.content.substring(0, 80) + '...' : record.content}
+            </Text>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status) => (
+        <Tag color={getStatusColor(status)}>
+          {getStatusText(status)}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Độ ưu tiên',
+      dataIndex: 'priority',
+      key: 'priority',
+      width: 120,
+      render: (priority) => (
+        <Tag color={getPriorityColor(priority)} icon={<FlagOutlined />}>
+          {getPriorityText(priority)}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Hạn hoàn thành',
+      dataIndex: 'timeFinish',
+      key: 'timeFinish',
+      width: 120,
+      render: (date) => (
+        date ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <CalendarOutlined style={{ fontSize: '12px' }} />
+            <span>{formatDate(date)}</span>
+          </div>
+        ) : (
+          <Text type="secondary">Không có</Text>
+        )
+      ),
+    },
+    {
+      title: 'Điểm ưu tiên',
+      dataIndex: 'smartScore',
+      key: 'smartScore',
+      width: 100,
+      sorter: (a, b) => (b.smartScore || 0) - (a.smartScore || 0),
+      defaultSortOrder: 'descend',
+      render: (score) => (
+        <Tag color="blue" style={{ fontWeight: 'bold', minWidth: '40px', textAlign: 'center' }}>
+          {score || 0}
+        </Tag>
+      ),
+    },
+    // {
+    //   title: 'Thao tác',
+    //   key: 'actions',
+    //   width: 150,
+    //   render: (_, record) => (
+    //     <Space>
+    //       <Tooltip title="Xem chi tiết">
+    //         <Button
+    //           size="small"
+    //           icon={<EyeOutlined />}
+    //           onClick={(e) => {
+    //             e.stopPropagation();
+    //             handleViewTaskDetail(record._id);
+    //           }}
+    //         />
+    //       </Tooltip>
+    //       <Tooltip title="Chỉnh sửa">
+    //         <Button
+    //           size="small"
+    //           icon={<EditOutlined />}
+    //           onClick={(e) => {
+    //             e.stopPropagation();
+    //             handleEditTask(record);
+    //           }}
+    //         />
+    //       </Tooltip>
+    //       <Tooltip title="Xóa">
+    //         <Button
+    //           size="small"
+    //           icon={<DeleteOutlined />}
+    //           danger
+    //           onClick={(e) => {
+    //             e.stopPropagation();
+    //             handleDeleteTask(record._id);
+    //           }}
+    //         />
+    //       </Tooltip>
+    //     </Space>
+    //   ),
+    // },
+  ];
 
   return (
     <div>
@@ -400,6 +630,8 @@ const PersonalTasks = () => {
             <p style={{ margin: 0, color: "#666" }}>
               {viewMode === "board" 
                 ? `Tổng số: ${boardTasks.length} công việc` 
+                : viewMode === "smart-sort"
+                ? `Đề xuất: ${smartSortTasks.length} công việc ưu tiên`
                 : `Trang ${pagination.current} • Tổng số: ${pagination.total} công việc`}
             </p>
           </div>
@@ -407,7 +639,10 @@ const PersonalTasks = () => {
             <Button
               icon={<ReloadOutlined />}
               onClick={handleRefresh}
-              loading={viewMode === "board" ? boardLoading : loading}
+              loading={
+                viewMode === "board" ? boardLoading : 
+                viewMode === "smart-sort" ? smartSortLoading : 
+                loading}
             >
               Làm mới
             </Button>
@@ -468,6 +703,13 @@ const PersonalTasks = () => {
               >
                 List
               </Button>
+              <Button
+                icon={<StarOutlined />} 
+                type={viewMode === "smart-sort" ? "primary" : "default"}
+                onClick={() => setViewMode("smart-sort")}
+              >
+                Smart Sort
+              </Button>
             </Space>
           </Col>
         </Row>
@@ -485,7 +727,11 @@ const PersonalTasks = () => {
       )}
 
       {/* Tasks Display */}
-      <Spin spinning={viewMode === "board" ? boardLoading : loading}>
+      <Spin spinning={
+        viewMode === "board" ? boardLoading : 
+        viewMode === "smart-sort" ? smartSortLoading :
+        loading
+        }>
         {viewMode === "board" ? (
           <TaskBoard
             tasks={boardTasks.map(mapTaskFromBackend)}
@@ -494,6 +740,70 @@ const PersonalTasks = () => {
             onTaskMove={handleTaskMove}
             onViewDetail={handleViewTaskDetail}
           />
+        ) : viewMode === "smart-sort" ? (
+          <div>
+            {/* Info về smart sort */}
+            {/* <Alert
+              message="Smart Sort - Gợi ý công việc ưu tiên"
+              description="Các công việc được sắp xếp theo độ ưu tiên dựa trên deadline, độ quan trọng và trạng thái. Điểm cao = Ưu tiên cao."
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            /> */}
+            
+            {/* Smart Sort Table */}
+            <Card>
+              {smartSortLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <Spin tip="Đang tải danh sách công việc..." />
+                </div>
+              ) : smartSortTasks.length === 0 ? (
+                <Empty
+                  description="Không tìm thấy công việc nào"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+              ) : (
+                <Table
+                  columns={smartSortColumns}
+                  dataSource={smartSortTasks.map((task, index) => ({
+                    ...mapTaskFromBackend(task),
+                    key: task._id,
+                    index,
+                  }))}
+                  pagination={false}
+                  size="middle"
+                  onRow={(record) => ({
+                    onClick: () => handleViewTaskDetail(record._id),
+                    style: { cursor: 'pointer' }
+                  })}
+                  scroll={{ x: 'max-content' }}
+                />
+              )}
+            </Card>
+            
+            {/* Ghi chú về màu sắc xếp hạng */}
+            {/* <Alert
+              message="Ghi chú:"
+              description={
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Badge color="#ff4d4f" />
+                    <span>Top 3: Ưu tiên cao nhất</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Badge color="#faad14" />
+                    <span>Top 4-6: Ưu tiên trung bình</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Badge color="#52c41a" />
+                    <span>Các công việc còn lại</span>
+                  </div>
+                </div>
+              }
+              type="info"
+              style={{ marginTop: 16 }}
+            /> */}
+          </div>
         ) : (
           <>
             <Row gutter={[16, 16]}>
@@ -535,6 +845,7 @@ const PersonalTasks = () => {
                 />
               </div>
             )}
+
           </>
         )}
       </Spin>

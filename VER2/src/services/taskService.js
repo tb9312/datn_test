@@ -129,6 +129,32 @@ const taskService = {
       throw error;
     }
   },
+  // Lấy danh sách tasks smart sort
+  async getSuggestedTasks(params = {}) {
+    try {
+      console.log("taskService.getSuggestedTasks called with params:", params);
+      const apiParams = {
+        keyword: params.keyword,
+        status: params.status,
+      };
+
+      const response = await apiClientV1.get(API_CONFIG.ENDPOINTS.TASKS.SUGGEST, {
+        params: apiParams,
+      });
+
+      console.log("getSuggestedTasks response:", response);
+
+      if (response.code && response.code !== 200) {
+        throw new Error(response.message || "Lỗi lấy danh sách gợi ý");
+      }
+
+      return response;
+    } catch (error) {
+      console.error("getSuggestedTasks error:", error);
+      throw error;
+    }
+  },
+
 };
 
 export default taskService;

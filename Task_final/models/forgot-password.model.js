@@ -15,7 +15,7 @@ const forgotPasswordSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 4,
-      maxlength: 6,
+      maxlength: 9,
     },
 
     expireAt: {

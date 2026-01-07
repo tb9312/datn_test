@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, theme } from 'antd';
+import React, { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Layout, Menu, theme } from "antd";
 import {
   DashboardOutlined,
   CheckCircleOutlined,
@@ -9,8 +9,8 @@ import {
   CalendarOutlined,
   BarChartOutlined,
   SettingOutlined,
-} from '@ant-design/icons';
-import { useAuth } from '../../contexts/AuthContext';
+} from "@ant-design/icons";
+import { useAuth } from "../../contexts/AuthContext";
 
 const { Sider } = Layout;
 
@@ -22,98 +22,98 @@ const Sidebar = ({ collapsed }) => {
     token: { colorBgContainer },
   } = theme.useToken();
   const [openKeys, setOpenKeys] = useState([]);
-  
+
   // THÊM DEBUG
-  console.log('📁 SIDEBAR DEBUG:');
-  console.log('User role:', user?.role);
-  console.log('isManager():', isManager());
-  
+  console.log("📁 SIDEBAR DEBUG:");
+  console.log("User role:", user?.role);
+  console.log("isManager():", isManager());
+
   let menuItems = [];
 
   // SỬA: Dùng isManager() thay vì kiểm tra string
-  if (user?.role === 'admin') {
+  if (user?.role === "admin") {
     menuItems = [
       {
-        key: '/admin',
+        key: "/admin",
         icon: <SettingOutlined />,
-        label: 'Quản Trị Hệ Thống',
+        label: "Quản Trị Hệ Thống",
       },
     ];
   }
   // SỬA: Dùng isManager() để kiểm tra
   else if (isManager()) {
-    console.log('✅ Sidebar: Rendering manager menu');
+    console.log("✅ Sidebar: Rendering manager menu");
     menuItems = [
       {
-        key: '/dashboard',
+        key: "/dashboard",
         icon: <DashboardOutlined />,
-        label: 'Dashboard',
+        label: "Dashboard",
       },
       {
-        key: '/tasks/team',
+        key: "/tasks/team",
         icon: <CheckCircleOutlined />,
-        label: 'Công việc nhóm',
+        label: "Công việc nhóm",
       },
       {
-        key: '/projects',
+        key: "/projects",
         icon: <ProjectOutlined />,
-        label: 'Dự Án',
+        label: "Dự Án",
       },
       {
-        key: '/teams',
+        key: "/teams",
         icon: <TeamOutlined />,
-        label: 'Nhóm',
+        label: "Nhóm",
       },
       {
-        key: '/calendar',
+        key: "/calendar",
         icon: <CalendarOutlined />,
-        label: 'Lịch',
+        label: "Lịch",
       },
       {
-        key: '/reports',
+        key: "/reports",
         icon: <BarChartOutlined />,
-        label: 'Báo Cáo',
+        label: "Báo Cáo",
       },
     ];
   }
   // User thường
   else {
-    console.log('✅ Sidebar: Rendering user menu');
+    console.log("✅ Sidebar: Rendering user menu");
     menuItems = [
       {
-        key: '/dashboard',
+        key: "/dashboard",
         icon: <DashboardOutlined />,
-        label: 'Dashboard',
+        label: "Dashboard",
       },
       {
-        key: '/tasks',
+        key: "/tasks",
         icon: <CheckCircleOutlined />,
-        label: 'Công Việc',
+        label: "Công Việc",
         children: [
           {
-            key: '/tasks/personal',
-            label: 'Cá Nhân',
+            key: "/tasks/personal",
+            label: "Cá Nhân",
           },
           {
-            key: '/tasks/team',
-            label: 'Nhóm',
+            key: "/tasks/team",
+            label: "Nhóm",
           },
         ],
       },
       {
-        key: '/projects',
+        key: "/projects",
         icon: <ProjectOutlined />,
-        label: 'Dự Án',
+        label: "Dự Án",
       },
       {
-        key: '/teams',
+        key: "/teams",
         icon: <TeamOutlined />,
-        label: 'Nhóm',
+        label: "Nhóm",
       },
       {
-        key: '/calendar',
+        key: "/calendar",
         icon: <CalendarOutlined />,
-        label: 'Lịch',
+        label: "Lịch",
       },
       // {
       //   key: '/personalreports',
@@ -133,61 +133,67 @@ const Sidebar = ({ collapsed }) => {
   };
 
   return (
-    <Sider 
-      trigger={null} 
-      collapsible 
+    <Sider
+      trigger={null}
+      collapsible
       collapsed={collapsed}
       style={{
         background: colorBgContainer,
-        boxShadow: '2px 0 6px rgba(0,21,41,0.1)',
+        boxShadow: "2px 0 6px rgba(0,21,41,0.1)",
       }}
       width={250}
     >
-      <div style={{
-        height: 64,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderBottom: '1px solid #f0f0f0',
-        marginBottom: 8,
-      }}>
-        <h2 style={{ 
-          margin: 0, 
-          color: '#1890ff',
-          fontSize: collapsed ? 14 : 18,
-          transition: 'all 0.2s'
-        }}>
-          {collapsed ? 'TM' : 'TaskManager'}
+      <div
+        style={{
+          height: 64,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderBottom: "1px solid #f0f0f0",
+          marginBottom: 8,
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            color: "#1890ff",
+            fontSize: collapsed ? 14 : 18,
+            transition: "all 0.2s",
+          }}
+        >
+          {collapsed ? "TM" : "TaskManager"}
         </h2>
       </div>
-      
-      <div style={{ 
-        padding: '8px 16px', 
-        fontSize: 12, 
-        color: '#666',
-        borderBottom: '1px solid #f0f0f0'
-      }}>
-        👋 Chào, <strong>{user?.fullName || user?.name || 'User'}</strong>
-        <div style={{ fontSize: 10, color: '#999' }}>
-          {user?.role === 'admin' && '🔧 Quản trị viên'}
-          {isManager() && '👔 Quản lý'} {/* SỬA */}
-          {!isManager() && user?.role === 'user' && '👤 Người dùng'}
+
+      <div
+        style={{
+          padding: "8px 16px",
+          fontSize: 12,
+          color: "#666",
+          borderBottom: "1px solid #f0f0f0",
+        }}
+      >
+        👋 Chào, <strong>{user?.fullName || user?.name || "User"}</strong>
+        <div style={{ fontSize: 10, color: "#999" }}>
+          {user?.role === "admin" && "🔧 Quản trị viên"}
+          {isManager() && "👔 Quản lý"} {/* SỬA */}
+          {!isManager() && user?.role === "user" && "👤 Người dùng"}
         </div>
         {/* Thêm debug info
         <div style={{ fontSize: 9, color: '#ccc', marginTop: 2 }}>
           Role: {user?.role} | isManager: {isManager() ? '✅' : '❌'}
         </div> */}
       </div>
-      
+
       <Menu
         mode="inline"
         selectedKeys={[location.pathname]}
-        defaultOpenKeys={['/tasks']}
+        defaultOpenKeys={["/tasks"]}
         items={menuItems}
         onClick={handleMenuClick}
         openKeys={openKeys}
         onOpenChange={onOpenChange}
-        style={{ border: 'none', marginTop: 8 }}
+        style={{ border: "none", marginTop: 8 }}
       />
     </Sider>
   );

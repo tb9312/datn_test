@@ -48,15 +48,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "active",
     },
-    // requestFriends: Array, // Lời mời đã gửi
-    // acceptFriends: Array, // Lời mời đã nhận
-    // friendList: [
-    //   // danh sách bạn bè
-    //   {
-    //     user_id: String,
-    //     room_chat_id: String,
-    //   },
-    // ],
     workingHoursPerDay: {
       type: Number,
       default: 8,
@@ -67,6 +58,19 @@ const userSchema = new mongoose.Schema(
     deletedBy: {
       account_id: String,
       deletedAt: Date,
+    },
+    // THÊM vào userSchema (sau field "role"):
+    skills: {
+      type: String,
+      enum: ["beginner", "intermediate", "expert"],
+      default: "intermediate",
+    },
+
+    // THÊM để cache workload (tính toán sau):
+    currentTaskCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     updatedBy: [
       {

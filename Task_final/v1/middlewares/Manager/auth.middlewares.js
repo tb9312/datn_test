@@ -7,7 +7,7 @@ module.exports.requireAuth = async (req, res, next) => {
     let token = null;
     if (authHeader.startsWith("Bearer ")) {
       token = authHeader.slice(7).trim();
-      console.log("token", token);
+      //console.log("token", token);
     }
     if (!token) {
       return res

@@ -7,6 +7,8 @@ const upload = multer();
 
 route.get("/", controller.index);
 
+route.get("/hotproject", controller.indexHot);
+
 route.get("/:parentId/tasks", controller.getTasksByParent);
 
 route.get("/detail/:id", controller.detail);
@@ -22,12 +24,27 @@ route.post(
   controller.create
 );
 
+route.post(
+  "/create_hot",
+  upload.single("thumbnail"),
+  uploadCloudinary.upload,
+  controller.createHot
+);
+route.patch(
+  "/edit_hot/:id",
+  upload.single("thumbnail"),
+  uploadCloudinary.upload,
+  controller.editHot
+);
+
 route.patch(
   "/edit/:id",
   upload.single("thumbnail"),
   uploadCloudinary.upload,
   controller.edit
 );
+
+route.patch("/refuse/:id", controller.refuseProject);
 
 route.patch("/delete/:id", controller.delete);
 
