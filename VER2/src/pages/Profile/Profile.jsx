@@ -7,6 +7,9 @@ import {
   Button,
   Upload,
   Space,
+  Select,
+  Tooltip,
+  Tag,
   message,
   Divider,
   Spin,
@@ -15,11 +18,14 @@ import {
   UploadOutlined,
   LoadingOutlined,
   UserOutlined,
+  StarOutlined,
+  StarTwoTone,
+  StarFilled
 } from "@ant-design/icons";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import authService from "../../services/authService";
-
+const { Option } = Select;
 const Profile = () => {
   const { user, logout, updateUser } = useAuth();
   const [form] = Form.useForm();
@@ -56,6 +62,7 @@ const Profile = () => {
             phone: currentUser.phone || "", // Để trống nếu không có
             position_job: currentUser.position_job || "", // Để trống nếu không có
             role: currentUser.role || "USER",
+            skills: currentUser.skills || '',
           });
 
           console.log("✅ Form values set:", {
@@ -63,6 +70,7 @@ const Profile = () => {
             email: currentUser.email,
             phone: currentUser.phone,
             position_job: currentUser.position_job,
+            skills: currentUser.skills,
           });
         } else {
           message.error("Không tìm thấy thông tin người dùng");
@@ -114,6 +122,7 @@ const Profile = () => {
       const updateData = {
         fullName: values.fullName,
         email: values.email,
+        skills: values.skills || '',
       };
 
       // Chỉ thêm phone nếu có giá trị
@@ -156,6 +165,7 @@ const Profile = () => {
             phone: result.data.phone || "",
             position_job: result.data.position_job || "",
             role: result.data.role || "USER",
+            skills: result.data.skills || '',
           });
 
           // 3. Cập nhật avatar preview nếu có
@@ -172,6 +182,7 @@ const Profile = () => {
             email: values.email,
             phone: values.phone || "",
             position_job: values.position_job || "",
+            skills: values.skills || '',
             role: user?.role || "USER",
             avatar: avatarUrl || user?.avatar || "",
             _id: user?._id,
@@ -205,6 +216,47 @@ const Profile = () => {
       <div style={{ marginTop: 8 }}>Tải ảnh lên</div>
     </div>
   );
+
+  // Hàm render skill level tag
+  const renderSkillLevelTag = (level) => {
+    const skillConfig ={
+      beginner: { 
+        color: 'green', 
+        text: 'Mới bắt đầu',
+        icon: <StarOutlined />,
+    
+      },
+      intermediate: {
+        color: 'blue',
+        text: 'Trung bình',
+        icon: <StarTwoTone twoToneColor="#52c41a" />,
+      },
+      expert: {
+        color: 'red',
+        text: 'Thành thạo',
+        icon: <StarFilled />,
+      }
+    };
+    const config = skillConfig[level] || skillConfig.intermediate;
+    return (
+      <Tooltip title={config.text}>
+        <Tag 
+          color={config.color}
+          icon={config.icon}
+          style={{
+            padding: '4px 12px',
+            fontSize: '14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          {config.icon}
+          {config.text}
+        </Tag>
+      </Tooltip>
+    );
+  };
 
   if (initializing) {
     return (
@@ -323,6 +375,38 @@ const Profile = () => {
           >
             <Input placeholder="Nhập vị trí công việc" />
           </Form.Item>
+
+          <Form.Item 
+            name="skills" 
+            label="Trình độ chuyên môn"
+          >
+            <Select style={{ width: 200 }}>
+              <Option value="beginner">
+                <Space>
+                  <StarOutlined style={{ color: '#52c41a' }} />
+                  <span>Mới bắt đầu</span>
+                </Space>
+              </Option>
+              <Option value="intermediate">
+                <Space>
+                  <StarTwoTone twoToneColor="#1890ff" />
+                  <span>Trung bình</span>
+                </Space>
+              </Option>
+              <Option value="expert">
+                <Space>
+                  <StarFilled style={{ color: '#ff4d4f' }} />
+                  <span>Thành thạo</span>
+                </Space>
+              </Option>
+            </Select>
+          </Form.Item>
+
+          {/* Hiển thị skill level hiện tại */}
+          <div style={{ marginBottom: 16 }}>
+            <span style={{ color: '#666', marginRight: 8 }}>Mức độ hiện tại:</span>
+            {form.getFieldValue('skills') && renderSkillLevelTag(form.getFieldValue('skills'))}
+          </div>
 
           <Form.Item name="role" label="Vai trò">
             <Input disabled />

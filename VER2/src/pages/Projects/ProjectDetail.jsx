@@ -1,4 +1,4 @@
-// pages/Projects/ProjectDetail.jsx
+// pages/Projects/ProjectDetail.jsx - ĐÃ FIX RESPONSIVE
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -25,6 +25,8 @@ import {
   DatePicker,
   App,
   Popconfirm,
+  Divider,
+  Badge
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -43,6 +45,9 @@ import {
   EyeOutlined,
   LockOutlined,
   SendOutlined,
+  MoreOutlined,
+  ProjectOutlined,
+  TagOutlined
 } from "@ant-design/icons";
 import moment from "moment";
 import { useAuth } from "../../contexts/AuthContext";
@@ -51,7 +56,9 @@ import ProjectForm from "../../components/Projects/ProjectForm";
 import userService from "../../services/userService";
 import HotUserSelect from "../../components/Projects/HotUserSelect";
 import hotProjectService from "../../services/hotProjectService";
-const { Title, Text } = Typography;
+import { useResponsive, getModalWidth } from "../../utils/responsiveUtils";
+
+const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
 const { Option } = Select;
@@ -60,6 +67,8 @@ const ProjectDetailContent = () => {
   const { id } = useParams();
   const { modal } = App.useApp();
   const navigate = useNavigate();
+  const { isMobile, isTablet, isDesktop } = useResponsive();
+  
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subProjects, setSubProjects] = useState([]);
@@ -75,9 +84,10 @@ const ProjectDetailContent = () => {
   const [users, setUsers] = useState([]);
   const [projectUsers, setProjectUsers] = useState([]);
   const [hotTaskModalVisible, setHotTaskModalVisible] = useState(false);
+  
   console.log("=== DEBUG PROJECT DETAIL ===");
   console.log("Project ID from URL:", id);
-  console.log("Full URL:", window.location.href);
+  console.log("Is Mobile:", isMobile, "Is Tablet:", isTablet);
 
   useEffect(() => {
     console.log("useEffect triggered, loading project:", id);
@@ -153,12 +163,13 @@ const ProjectDetailContent = () => {
       setUsers([]);
     }
   };
+
   // Load comments riêng
   const loadComments = async () => {
     try {
       console.log("=== Loading Comments for Project ===", id);
 
-      //Load project detail để lấy comments
+      // Load project detail để lấy comments
       const response = await projectService.getProjectDetail(id);
       console.log("Project detail for comments response:", response);
       if (response.success) {
@@ -172,6 +183,7 @@ const ProjectDetailContent = () => {
       setComments([]);
     }
   };
+
   // Load chi tiết dự án
   const loadProjectDetail = async () => {
     console.log("Loading project detail for ID:", id);
@@ -200,7 +212,6 @@ const ProjectDetailContent = () => {
       }
 
       setProject(projectData);
-      // setComments(response.comments || []);
 
       // 2. Load sub-projects (công việc) bằng API mới
       console.log("📋 Fetching sub-projects for project:", id);
@@ -438,17 +449,7 @@ const ProjectDetailContent = () => {
 
     return isMember || false;
   };
-  // Get thong tin user
-  const getUserFromComment = (comment) => {
-    if (comment.user && typeof comment.user === "object") {
-      return comment.user;
-    }
-    const userId = comment.user_id || comment.user;
-    if (userId) {
-      return getUserInfo(userId);
-    }
-    return null;
-  };
+
   const isCommentOwner = (comment) => {
     if (!comment || !comment.user || !user) return false;
 
@@ -458,6 +459,7 @@ const ProjectDetailContent = () => {
 
     return commentUserId === currentUserId;
   };
+
   // Thêm comment
   const handleAddComment = async () => {
     if (!commentText.trim()) {
@@ -640,70 +642,85 @@ const ProjectDetailContent = () => {
   const projectCreator = getUserInfo(project.createdBy);
   const isCreator = project.createdBy === user?.id;
 
+  // Responsive settings
+  const modalWidth = getModalWidth(isMobile, isTablet, isDesktop);
+  const avatarSize = isMobile ? 'small' : isTablet ? 'default' : 'large';
+
   return (
-    <div>
+    <div className="project-detail-page">
+      {/* Breadcrumb */}
       <Breadcrumb style={{ marginBottom: 16 }}>
         <Breadcrumb.Item>
           <a
             onClick={() => navigate("/projects")}
             style={{ cursor: "pointer" }}
+            className="breadcrumb-link"
           >
-            Dự án
+            <ProjectOutlined /> {isMobile ? "Dự án" : "Dự án"}
           </a>
         </Breadcrumb.Item>
-        <Breadcrumb.Item>{project.title}</Breadcrumb.Item>
+        <Breadcrumb.Item>
+          <span className="breadcrumb-current">
+            {isMobile && project.title.length > 20 
+              ? project.title.substring(0, 20) + "..." 
+              : project.title}
+          </span>
+        </Breadcrumb.Item>
       </Breadcrumb>
 
       {/* Project Header */}
-      <Card style={{ marginBottom: 16 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <div
-              style={{ display: "flex", alignItems: "center", marginBottom: 8 }}
-            >
-              <Title level={2} style={{ margin: 0, marginRight: 16 }}>
-                {project.title}
+      <Card className="project-header-card">
+        <div className="project-header-content">
+          <div className="project-header-info">
+            <div className="project-title-section">
+              <Title level={isMobile ? 3 : 2} style={{ margin: 0, marginRight: 16 }} className="project-title">
+                {isMobile && project.title.length > 30 
+                  ? project.title.substring(0, 30) + "..." 
+                  : project.title}
               </Title>
-              <Space>
-                <Tag color={getStatusColor(project.status)}>
-                  {getStatusText(project.status)}
-                </Tag>
-                <Tag color={getPriorityColor(project.priority)}>
-                  {project.priority === "high"
-                    ? "Ưu tiên cao"
-                    : project.priority === "medium"
-                    ? "Ưu tiên trung bình"
-                    : "Ưu tiên thấp"}
-                </Tag>
-                {isCreator && (
-                  <Tag color="gold" icon={<CrownOutlined />}>
-                    Bạn phụ trách
+              <div className="project-tags">
+                <Space wrap size={isMobile ? 4 : 8}>
+                  <Tag color={getStatusColor(project.status)} size={isMobile ? "small" : "default"}>
+                    {getStatusText(project.status)}
                   </Tag>
-                )}
-              </Space>
+                  <Tag color={getPriorityColor(project.priority)} size={isMobile ? "small" : "default"}>
+                    {project.priority === "high"
+                      ? "Ưu tiên cao"
+                      : project.priority === "medium"
+                      ? "Ưu tiên trung bình"
+                      : "Ưu tiên thấp"}
+                  </Tag>
+                  {isCreator && (
+                    <Tag color="gold" icon={<CrownOutlined />} size={isMobile ? "small" : "default"}>
+                      {isMobile ? "Bạn" : "Bạn phụ trách"}
+                    </Tag>
+                  )}
+                </Space>
+              </div>
             </div>
 
-            <Text
-              style={{ color: "#666", fontSize: "16px", lineHeight: "1.6" }}
+            <Paragraph
+              className="project-description"
+              style={{ 
+                color: "#666", 
+                fontSize: isMobile ? "14px" : "16px", 
+                lineHeight: "1.6",
+                marginBottom: isMobile ? 8 : 12
+              }}
+              ellipsis={isMobile ? { rows: 2 } : { rows: 3 }}
             >
               {project.content}
-            </Text>
+            </Paragraph>
 
             {/* Project Thumbnail */}
             {project.thumbnail && (
-              <div style={{ marginTop: 12 }}>
+              <div className="project-thumbnail">
                 <img
                   src={project.thumbnail}
                   alt="Thumbnail"
                   style={{
                     maxWidth: "100%",
-                    maxHeight: 200,
+                    maxHeight: isMobile ? 150 : 200,
                     objectFit: "cover",
                     borderRadius: "8px",
                   }}
@@ -712,95 +729,107 @@ const ProjectDetailContent = () => {
             )}
           </div>
 
-          <Space>
-            {/* Chỉ hiển thị nút Thêm công việc nếu user có quyền */}
-            {canCreateSubProject() ? (
-              <>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setSubProjectModalVisible(true)}
-                >
-                  Thêm công việc
-                </Button>
-                {/* CHỈ MANAGER mới thấy nút này */}
-                {user?.role === "manager" ||
-                  (user?.role === "MANAGER" && (
+          <div className="project-action-buttons">
+            <Space direction={isMobile ? "vertical" : "horizontal"} style={{ width: isMobile ? "100%" : "auto" }}>
+              {/* Chỉ hiển thị nút Thêm công việc nếu user có quyền */}
+              {canCreateSubProject() ? (
+                <>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => setSubProjectModalVisible(true)}
+                    size={isMobile ? "middle" : "large"}
+                    block={isMobile}
+                  >
+                    {isMobile ? "Thêm CV" : "Thêm công việc"}
+                  </Button>
+                  {/* CHỈ MANAGER mới thấy nút này */}
+                  {(user?.role === "manager" || user?.role === "MANAGER") && (
                     <Button
                       type="primary"
                       danger
                       icon={<FireOutlined />}
                       onClick={() => setHotTaskModalVisible(true)}
+                      size={isMobile ? "middle" : "large"}
+                      block={isMobile}
                     >
-                      Thêm công việc đột xuất
+                      {isMobile ? "CV đột xuất" : "Công việc đột xuất"}
                     </Button>
-                  ))}
-              </>
-            ) : (
-              <Tooltip title="Bạn không có quyền tạo công việc trong dự án này">
-                <Button type="primary" icon={<LockOutlined />} disabled>
-                  Thêm công việc
-                </Button>
-              </Tooltip>
-            )}
-          </Space>
+                  )}
+                </>
+              ) : (
+                <Tooltip title="Bạn không có quyền tạo công việc trong dự án này">
+                  <Button type="primary" icon={<LockOutlined />} disabled block={isMobile}>
+                    {isMobile ? "Thêm CV" : "Thêm công việc"}
+                  </Button>
+                </Tooltip>
+              )}
+            </Space>
+          </div>
         </div>
       </Card>
 
       {/* Project Statistics */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={6}>
-          <Card>
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title="Tổng công việc"
+              title={isMobile ? "Tổng CV" : "Tổng công việc"}
               value={subProjectStats.total}
               prefix={<FileTextOutlined />}
+              valueStyle={{ fontSize: isMobile ? 20 : 24 }}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card>
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title="Đã hoàn thành"
+              title={isMobile ? "Hoàn thành" : "Đã hoàn thành"}
               value={subProjectStats.completed}
-              valueStyle={{ color: "#52c41a" }}
+              valueStyle={{ color: "#52c41a", fontSize: isMobile ? 20 : 24 }}
               prefix={<CheckCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card>
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title="Đang thực hiện"
+              title={isMobile ? "Đang làm" : "Đang thực hiện"}
               value={subProjectStats.inProgress}
-              valueStyle={{ color: "#1890ff" }}
+              valueStyle={{ color: "#1890ff", fontSize: isMobile ? 20 : 24 }}
               prefix={<ClockCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card>
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title="Tỷ lệ hoàn thành"
+              title={isMobile ? "Hoàn thành" : "Công việc hoàn thành"}
               value={completionRate}
               suffix="%"
               valueStyle={{
                 color: completionRate === 100 ? "#52c41a" : "#faad14",
+                fontSize: isMobile ? 20 : 24
               }}
             />
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[16, 16]} className="project-detail-row">
         {/* Project Details */}
-        <Col xs={24} lg={8}>
-          <Card title="Thông tin dự án" style={{ marginBottom: 16 }}>
-            <Descriptions column={1} size="small">
+        <Col xs={24} md={8} lg={8} xl={7} className="project-sidebar-col">
+          <Card className="project-info-card" style={{ marginBottom: 16 }}>
+            <div className="card-header">
+              <Title level={isMobile ? 5 : 4} style={{ margin: 0 }}>
+                {isMobile ? "Thông tin" : "Thông tin dự án"}
+              </Title>
+            </div>
+            <Descriptions column={1} size="small" className="project-info-list">
               <Descriptions.Item label="Người tạo & phụ trách">
                 <Space>
                   <Avatar
-                    size="small"
+                    size={isMobile ? "small" : "default"}
                     src={projectCreator?.avatar}
                     icon={<CrownOutlined />}
                     style={{
@@ -808,14 +837,16 @@ const ProjectDetailContent = () => {
                       color: "#fff",
                     }}
                   />
-                  <span>
-                    {projectCreator?.fullName || project.createdBy}
+                  <div className="user-info">
+                    <span className="user-name">
+                      {projectCreator?.fullName || project.createdBy}
+                    </span>
                     {isCreator && (
                       <Tag color="gold" size="small" style={{ marginLeft: 8 }}>
                         Bạn
                       </Tag>
                     )}
-                  </span>
+                  </div>
                 </Space>
               </Descriptions.Item>
 
@@ -824,7 +855,7 @@ const ProjectDetailContent = () => {
                   <CalendarOutlined />
                   <span>
                     {project.timeStart
-                      ? moment(project.timeStart).format("DD/MM/YYYY")
+                      ? moment(project.timeStart).format(isMobile ? "DD/MM" : "DD/MM/YYYY")
                       : "Chưa có"}
                   </span>
                 </Space>
@@ -835,28 +866,36 @@ const ProjectDetailContent = () => {
                   <CalendarOutlined />
                   <span>
                     {project.timeFinish
-                      ? moment(project.timeFinish).format("DD/MM/YYYY")
+                      ? moment(project.timeFinish).format(isMobile ? "DD/MM" : "DD/MM/YYYY")
                       : "Chưa có"}
                   </span>
                 </Space>
               </Descriptions.Item>
 
               <Descriptions.Item label="Ngày tạo">
-                {moment(project.createdAt).format("DD/MM/YYYY HH:mm")}
+                {moment(project.createdAt).format(isMobile ? "DD/MM HH:mm" : "DD/MM/YYYY HH:mm")}
               </Descriptions.Item>
             </Descriptions>
           </Card>
 
           {/* Team Members */}
           {projectUsers.length > 0 && (
-            <Card title="Thành viên nhóm" style={{ marginBottom: 16 }}>
+            <Card className="team-members-card" style={{ marginBottom: 16 }}>
+              <div className="card-header">
+                <Title level={isMobile ? 5 : 4} style={{ margin: 0 }}>
+                  {isMobile ? "Thành viên" : "Thành viên nhóm"}
+                </Title>
+              </div>
               <List
+                className="team-members-list"
                 dataSource={projectUsers}
+                size={isMobile ? "small" : "default"}
                 renderItem={(userItem) => (
-                  <List.Item>
+                  <List.Item className="team-member-item">
                     <List.Item.Meta
                       avatar={
                         <Avatar
+                          size={isMobile ? "small" : "default"}
                           src={userItem.avatar}
                           icon={
                             userItem._id === project.createdBy ? (
@@ -876,21 +915,27 @@ const ProjectDetailContent = () => {
                         </Avatar>
                       }
                       title={
-                        <Space>
-                          <span>{userItem.fullName}</span>
-                          {userItem._id === project.createdBy && (
-                            <Tag color="gold" size="small">
-                              Phụ trách
-                            </Tag>
-                          )}
-                          {userItem._id === user?.id && (
-                            <Tag color="green" size="small">
-                              Bạn
-                            </Tag>
-                          )}
-                        </Space>
+                        <div className="member-title">
+                          <span className="member-name">{userItem.fullName}</span>
+                          <div className="member-tags">
+                            {userItem._id === project.createdBy && (
+                              <Tag color="gold" size="small">
+                                {isMobile ? "PT" : "Phụ trách"}
+                              </Tag>
+                            )}
+                            {userItem._id === user?.id && (
+                              <Tag color="green" size="small">
+                                Bạn
+                              </Tag>
+                            )}
+                          </div>
+                        </div>
                       }
-                      description={userItem.email}
+                      description={
+                        <div className="member-email">
+                          {!isMobile && userItem.email}
+                        </div>
+                      }
                     />
                   </List.Item>
                 )}
@@ -900,28 +945,37 @@ const ProjectDetailContent = () => {
         </Col>
 
         {/* Main Content - Sub Projects */}
-        <Col xs={24} lg={16}>
-          <Card>
-            <Tabs defaultActiveKey="subProjects">
+        <Col xs={24} md={16} lg={16} xl={17} className="project-main-col">
+          <Card className="project-content-card">
+            <Tabs 
+              defaultActiveKey="subProjects" 
+              size={isMobile ? "small" : "default"}
+              className="project-tabs"
+            >
               <TabPane
-                tab={`Công việc (${subProjects.length})`}
+                tab={
+                  <span>
+                    <FileTextOutlined /> {isMobile ? `CV (${subProjects.length})` : `Công việc (${subProjects.length})`}
+                  </span>
+                }
                 key="subProjects"
               >
                 {subProjects.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 0" }}>
+                  <div className="empty-state">
                     <FileTextOutlined
                       style={{
-                        fontSize: 48,
+                        fontSize: isMobile ? 36 : 48,
                         color: "#d9d9d9",
                         marginBottom: 16,
                       }}
                     />
-                    <div>Chưa có công việc nào</div>
+                    <div style={{ fontSize: isMobile ? 14 : 16 }}>Chưa có công việc nào</div>
                     {canCreateSubProject() && (
                       <Button
                         type="primary"
                         style={{ marginTop: 16 }}
                         onClick={() => setSubProjectModalVisible(true)}
+                        size={isMobile ? "middle" : "large"}
                       >
                         Thêm công việc đầu tiên
                       </Button>
@@ -929,7 +983,9 @@ const ProjectDetailContent = () => {
                   </div>
                 ) : (
                   <List
+                    className="subprojects-list"
                     dataSource={subProjects}
+                    size={isMobile ? "small" : "default"}
                     renderItem={(subProject) => {
                       const subProjectCreator = getUserInfo(
                         subProject.createdBy
@@ -939,48 +995,110 @@ const ProjectDetailContent = () => {
 
                       return (
                         <List.Item
-                          actions={[
-                            // Trong ProjectDetail.jsx - phần render subProjects
-                            <Button
-                              size="small"
-                              icon={<EyeOutlined />}
-                              onClick={() =>
-                                navigate(
-                                  `/projects/detail/${id}/subproject/${subProject._id}`,
-                                  {
-                                    state: { parentProjectId: id }, // Pass parent ID để không cần query lại
-                                  }
-                                )
-                              }
-                            >
-                              Xem chi tiết
-                            </Button>,
-
-                            // Chỉ hiển thị nút sửa/xóa nếu có quyền
-                            canEditSubProject(subProject) && (
-                              <>
-                                <Button
-                                  size="small"
-                                  icon={<EditOutlined />}
-                                  onClick={() =>
-                                    handleEditSubProject(subProject)
-                                  }
-                                >
-                                  Sửa
-                                </Button>
-                                <Button
-                                  size="small"
-                                  icon={<DeleteOutlined />}
-                                  danger
-                                  onClick={() =>
-                                    handleDeleteSubProject(subProject._id)
-                                  }
-                                >
-                                  Xóa
-                                </Button>
-                              </>
-                            ),
-                          ].filter(Boolean)}
+                          className="subproject-item"
+                          actions={
+                            isMobile
+                              ? [
+                                  <Button
+                                    key="view"
+                                    size="small"
+                                    icon={<EyeOutlined />}
+                                    onClick={() =>
+                                      navigate(
+                                        `/projects/detail/${id}/subproject/${subProject._id}`,
+                                        {
+                                          state: { parentProjectId: id },
+                                        }
+                                      )
+                                    }
+                                  />,
+                                  canEditSubProject(subProject) && (
+                                    <Button
+                                      key="more"
+                                      size="small"
+                                      icon={<MoreOutlined />}
+                                      onClick={() => {
+                                        // Show dropdown menu on mobile
+                                        modal.confirm({
+                                          title: 'Tùy chọn công việc',
+                                          content: (
+                                            <div>
+                                              <Button 
+                                                type="text" 
+                                                block 
+                                                icon={<EditOutlined />}
+                                                onClick={() => {
+                                                  modal.destroy();
+                                                  handleEditSubProject(subProject);
+                                                }}
+                                              >
+                                                Chỉnh sửa
+                                              </Button>
+                                              <Divider style={{ margin: '8px 0' }} />
+                                              <Button 
+                                                type="text" 
+                                                danger 
+                                                block 
+                                                icon={<DeleteOutlined />}
+                                                onClick={() => {
+                                                  modal.destroy();
+                                                  handleDeleteSubProject(subProject._id);
+                                                }}
+                                              >
+                                                Xóa
+                                              </Button>
+                                            </div>
+                                          ),
+                                          footer: null,
+                                          width: 250
+                                        });
+                                      }}
+                                    />
+                                  )
+                                ].filter(Boolean)
+                              : [
+                                  <Button
+                                    key="view"
+                                    size="small"
+                                    icon={<EyeOutlined />}
+                                    onClick={() =>
+                                      navigate(
+                                        `/projects/detail/${id}/subproject/${subProject._id}`,
+                                        {
+                                          state: { parentProjectId: id },
+                                        }
+                                      )
+                                    }
+                                  >
+                                    Xem chi tiết
+                                  </Button>,
+                                  canEditSubProject(subProject) && (
+                                    <>
+                                      <Button
+                                        key="edit"
+                                        size="small"
+                                        icon={<EditOutlined />}
+                                        onClick={() =>
+                                          handleEditSubProject(subProject)
+                                        }
+                                      >
+                                        Sửa
+                                      </Button>
+                                      <Button
+                                        key="delete"
+                                        size="small"
+                                        icon={<DeleteOutlined />}
+                                        danger
+                                        onClick={() =>
+                                          handleDeleteSubProject(subProject._id)
+                                        }
+                                      >
+                                        Xóa
+                                      </Button>
+                                    </>
+                                  ),
+                                ].filter(Boolean)
+                          }
                         >
                           <List.Item.Meta
                             avatar={
@@ -991,95 +1109,119 @@ const ProjectDetailContent = () => {
                                     : "Người tạo"
                                 }
                               >
-                                <Avatar
-                                  style={{
-                                    backgroundColor: isSubProjectCreator
-                                      ? "#52c41a"
-                                      : getStatusColor(subProject.status),
-                                    color: "#fff",
-                                  }}
-                                  src={subProjectCreator?.avatar}
+                                <Badge
+                                  dot
+                                  color={getStatusColor(subProject.status)}
+                                  offset={[-5, 5]}
                                 >
-                                  {subProjectCreator?.fullName?.charAt(0) ||
-                                    subProject.title?.charAt(0) ||
-                                    "T"}
-                                </Avatar>
+                                  <Avatar
+                                    size={isMobile ? "small" : "default"}
+                                    style={{
+                                      backgroundColor: isSubProjectCreator
+                                        ? "#52c41a"
+                                        : getStatusColor(subProject.status),
+                                      color: "#fff",
+                                    }}
+                                    src={subProjectCreator?.avatar}
+                                  >
+                                    {subProjectCreator?.fullName?.charAt(0) ||
+                                      subProject.title?.charAt(0) ||
+                                      "T"}
+                                  </Avatar>
+                                </Badge>
                               </Tooltip>
                             }
                             title={
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 8,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <span>{subProject.title}</span>
-
-                                {/* Hiển thị người tạo/phụ trách */}
-                                {subProjectCreator && (
-                                  <Tag
-                                    color={
-                                      isSubProjectCreator ? "green" : "blue"
-                                    }
+                              <div className="subproject-title-section">
+                                <div className="subproject-title-row">
+                                  <span className="subproject-name">
+                                    {isMobile && subProject.title.length > 25
+                                      ? subProject.title.substring(0, 25) + "..."
+                                      : subProject.title}
+                                  </span>
+                                  <div className="subproject-tags">
+                                    {subProject.statusHot && (
+                                  <Tag 
+                                    color="red" 
                                     size="small"
-                                    style={{ margin: 0 }}
+                                    icon={<FireOutlined />}
+                                    style={{ 
+                                      fontWeight: 500,
+                                      borderColor: '#ff4d4f'
+                                    }}
                                   >
-                                    <Space size={4}>
-                                      <UserOutlined />
-                                      <span>{subProjectCreator.fullName}</span>
-                                      {isSubProjectCreator && (
-                                        <span
-                                          style={{
-                                            color: "#fff",
-                                            fontWeight: "bold",
-                                          }}
-                                        >
-                                          (Bạn)
-                                        </span>
-                                      )}
-                                    </Space>
+                                    {isMobile ? "Đột xuất" : "Công việc đột xuất"}
                                   </Tag>
                                 )}
-
-                                {/* Status và Priority tags */}
-                                <Tag
-                                  color={getStatusColor(subProject.status)}
-                                  size="small"
-                                >
-                                  {getStatusText(subProject.status)}
-                                </Tag>
-                                <Tag
-                                  color={getPriorityColor(subProject.priority)}
-                                  size="small"
-                                >
-                                  {subProject.priority === "high"
-                                    ? "Cao"
-                                    : subProject.priority === "medium"
-                                    ? "TB"
-                                    : "Thấp"}
-                                </Tag>
+                                    {subProjectCreator && (
+                                      <Tag
+                                        color={
+                                          isSubProjectCreator ? "green" : "blue"
+                                        }
+                                        size="small"
+                                      >
+                                        <Space size={2}>
+                                          <UserOutlined />
+                                          {isMobile ? (
+                                            <span>{subProjectCreator.fullName.substring(0, 5)}...</span>
+                                          ) : (
+                                            <span>{subProjectCreator.fullName}</span>
+                                          )}
+                                          {isSubProjectCreator && (
+                                            <span className="you-tag">(Bạn)</span>
+                                          )}
+                                        </Space>
+                                      </Tag>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="subproject-status-row">
+                                  <Tag
+                                    color={getStatusColor(subProject.status)}
+                                    size="small"
+                                  >
+                                    {getStatusText(subProject.status)}
+                                  </Tag>
+                                  <Tag
+                                    color={getPriorityColor(subProject.priority)}
+                                    size="small"
+                                  >
+                                    {subProject.priority === "high"
+                                      ? "Cao"
+                                      : subProject.priority === "medium"
+                                      ? "TB"
+                                      : "Thấp"}
+                                  </Tag>
+                                </div>
                               </div>
                             }
                             description={
-                              <div>
-                                <div style={{ marginBottom: 4 }}>
-                                  {subProject.content}
+                              <div className="subproject-description">
+                                <div className="subproject-content">
+                                  {isMobile && subProject.content && subProject.content.length > 40
+                                    ? subProject.content.substring(0, 40) + "..."
+                                    : subProject.content}
                                 </div>
-                                <div
-                                  style={{ fontSize: "12px", color: "#999" }}
-                                >
-                                  {subProject.timeStart &&
-                                    `Bắt đầu: ${moment(
-                                      subProject.timeStart
-                                    ).format("DD/MM")} • `}
-                                  {subProject.timeFinish &&
-                                    `Hạn: ${moment(
-                                      subProject.timeFinish
-                                    ).format("DD/MM")} • `}
-                                  {subProject.listUser?.length > 0 &&
-                                    `Thành viên: ${subProject.listUser.length}`}
+                                <div className="subproject-meta">
+                                  {subProject.timeStart && (
+                                    <span className="meta-item">
+                                      📅 Bắt đầu: {moment(
+                                        subProject.timeStart
+                                      ).format("DD/MM")}
+                                    </span>
+                                  )}
+                                  {subProject.timeFinish && (
+                                    <span className="meta-item">
+                                      • Hạn: {moment(
+                                        subProject.timeFinish
+                                      ).format("DD/MM")}
+                                    </span>
+                                  )}
+                                  {subProject.listUser?.length > 0 && (
+                                    <span className="meta-item">
+                                      • 👥 {subProject.listUser.length}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             }
@@ -1091,33 +1233,43 @@ const ProjectDetailContent = () => {
                 )}
               </TabPane>
 
-              <TabPane tab="Thảo luận" key="discussions">
+              <TabPane 
+                tab={
+                  <span>
+                    <CommentOutlined /> {isMobile ? `TL (${comments.length})` : `Thảo luận (${comments.length})`}
+                  </span>
+                } 
+                key="discussions"
+              >
                 {/* Kiểm tra quyền comment trước khi hiển thị input */}
                 {canComment() ? (
-                  <Card style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", gap: 8 }}>
+                  <Card className="comment-input-card" style={{ marginBottom: 16 }}>
+                    <div className="comment-input-wrapper">
                       <Avatar
-                        size="large"
+                        size={isMobile ? "default" : "large"}
                         src={user?.avatar}
                         icon={<UserOutlined />}
                         style={{ backgroundColor: "#1890ff" }}
+                        className="comment-avatar"
                       />
-                      <div style={{ flex: 1 }}>
+                      <div className="comment-input-content">
                         <TextArea
-                          rows={3}
+                          rows={isMobile ? 2 : 3}
                           placeholder="Thêm bình luận..."
                           value={commentText}
                           onChange={(e) => setCommentText(e.target.value)}
                           maxLength={500}
                           showCount
+                          className="comment-textarea"
                         />
-                        <div style={{ marginTop: 8, textAlign: "right" }}>
+                        <div className="comment-actions">
                           <Button
                             type="primary"
                             icon={<SendOutlined />}
                             onClick={handleAddComment}
                             loading={submitting}
                             disabled={!commentText.trim()}
+                            size={isMobile ? "small" : "middle"}
                           >
                             Gửi
                           </Button>
@@ -1127,9 +1279,10 @@ const ProjectDetailContent = () => {
                   </Card>
                 ) : (
                   <Card
+                    className="comment-permission-card"
                     style={{ marginBottom: 16, backgroundColor: "#fff2e8" }}
                   >
-                    <div style={{ textAlign: "center", padding: "16px" }}>
+                    <div className="permission-message">
                       <LockOutlined
                         style={{
                           fontSize: 24,
@@ -1138,7 +1291,7 @@ const ProjectDetailContent = () => {
                         }}
                       />
                       <div>Bạn không có quyền comment trong dự án này</div>
-                      <Text type="secondary" style={{ fontSize: "12px" }}>
+                      <Text type="secondary" style={{ fontSize: isMobile ? "11px" : "12px" }}>
                         Chỉ người tạo và thành viên của dự án mới được comment
                       </Text>
                     </div>
@@ -1147,19 +1300,19 @@ const ProjectDetailContent = () => {
 
                 {/* Comments List */}
                 {comments.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 0" }}>
+                  <div className="empty-comments">
                     <CommentOutlined
                       style={{
-                        fontSize: 48,
+                        fontSize: isMobile ? 36 : 48,
                         color: "#d9d9d9",
                         marginBottom: 16,
                       }}
                     />
-                    <div>Chưa có bình luận nào</div>
+                    <div style={{ fontSize: isMobile ? 14 : 16 }}>Chưa có bình luận nào</div>
                     {!canComment() && (
                       <Text
                         type="secondary"
-                        style={{ fontSize: "12px", marginTop: 8 }}
+                        style={{ fontSize: isMobile ? "11px" : "12px", marginTop: 8 }}
                       >
                         Tham gia dự án để bình luận
                       </Text>
@@ -1167,9 +1320,11 @@ const ProjectDetailContent = () => {
                   </div>
                 ) : (
                   <List
+                    className="comments-list"
                     dataSource={comments.sort(
                       (a, b) => (b.position || 0) - (a.position || 0)
                     )}
+                    size={isMobile ? "small" : "default"}
                     renderItem={(comment) => {
                       const commentUser = comment.user;
                       const isCommentOwner =
@@ -1183,6 +1338,7 @@ const ProjectDetailContent = () => {
                       return (
                         <List.Item
                           key={comment._id}
+                          className="comment-item"
                           actions={[
                             isCommentOwner && (
                               <Button
@@ -1191,7 +1347,7 @@ const ProjectDetailContent = () => {
                                 icon={<EditOutlined />}
                                 onClick={() => handleEditComment(comment)}
                               >
-                                Sửa
+                                {isMobile ? "Sửa" : "Sửa"}
                               </Button>
                             ),
 
@@ -1210,7 +1366,7 @@ const ProjectDetailContent = () => {
                                   danger
                                   icon={<DeleteOutlined />}
                                 >
-                                  Xóa
+                                  {isMobile ? "Xóa" : "Xóa"}
                                 </Button>
                               </Popconfirm>
                             ),
@@ -1219,7 +1375,7 @@ const ProjectDetailContent = () => {
                           <List.Item.Meta
                             avatar={
                               <Avatar
-                                size="large"
+                                size={isMobile ? "default" : "large"}
                                 src={commentUser?.avatar}
                                 style={{
                                   backgroundColor: isCommentOwner
@@ -1234,54 +1390,53 @@ const ProjectDetailContent = () => {
                               </Avatar>
                             }
                             title={
-                              <Space>
-                                <strong>
-                                  {commentUser?.fullName || comment.userName}
-                                </strong>
-                                {isCommentOwner && (
-                                  <Tag color="blue" size="small">
-                                    Bạn
-                                  </Tag>
-                                )}
-                                {commentUser &&
-                                  commentUser._id === project.createdBy && (
-                                    <Tag
-                                      color="gold"
-                                      size="small"
-                                      icon={<CrownOutlined />}
-                                    >
-                                      Phụ trách
+                              <div className="comment-header">
+                                <Space wrap size={4}>
+                                  <strong className="comment-author">
+                                    {commentUser?.fullName || comment.userName}
+                                  </strong>
+                                  {isCommentOwner && (
+                                    <Tag color="blue" size="small">
+                                      Bạn
                                     </Tag>
                                   )}
-                                <Tooltip
-                                  title={moment(
-                                    comment.createdAt || comment.created_at
-                                  ).format("YYYY-MM-DD HH:mm:ss")}
-                                >
-                                  <span style={{ color: "#999", fontSize: 12 }}>
-                                    {moment(
+                                  {commentUser &&
+                                    commentUser._id === project.createdBy && (
+                                      <Tag
+                                        color="gold"
+                                        size="small"
+                                        icon={<CrownOutlined />}
+                                      >
+                                        {isMobile ? "PT" : "Phụ trách"}
+                                      </Tag>
+                                    )}
+                                  <Tooltip
+                                    title={moment(
                                       comment.createdAt || comment.created_at
-                                    ).fromNow()}
-                                  </span>
-                                </Tooltip>
-                              </Space>
+                                    ).format("YYYY-MM-DD HH:mm:ss")}
+                                  >
+                                    <span className="comment-time">
+                                      {moment(
+                                        comment.createdAt || comment.created_at
+                                      ).fromNow()}
+                                    </span>
+                                  </Tooltip>
+                                </Space>
+                              </div>
                             }
                             description={
-                              <div>
+                              <div className="comment-body">
                                 <p
                                   style={{ margin: 0, whiteSpace: "pre-wrap" }}
+                                  className="comment-content"
                                 >
-                                  {comment.content || comment.comment || ""}
+                                  {commentContent}
                                 </p>
                                 {comment.updatedAt &&
                                   comment.updatedAt !== comment.createdAt && (
                                     <Text
                                       type="secondary"
-                                      style={{
-                                        fontSize: "11px",
-                                        marginTop: 4,
-                                        display: "block",
-                                      }}
+                                      className="comment-edited"
                                     >
                                       <EditOutlined /> Đã chỉnh sửa{" "}
                                       {moment(comment.updatedAt).fromNow()}
@@ -1331,6 +1486,8 @@ const ProjectDetailContent = () => {
             Lưu thay đổi
           </Button>,
         ]}
+        width={isMobile ? '95%' : 500}
+        centered
       >
         <TextArea
           rows={4}
@@ -1352,8 +1509,9 @@ const ProjectDetailContent = () => {
           setEditingSubProject(null);
         }}
         footer={null}
-        width={700}
+        width={modalWidth}
         destroyOnClose
+        centered
       >
         <ProjectForm
           visible={subProjectModalVisible}
@@ -1372,6 +1530,7 @@ const ProjectDetailContent = () => {
           autoAssignToCreator={true}
           isCreatingTask={true}
           parentProjectId={id}
+          isMobile={isMobile}
         />
       </Modal>
 
@@ -1386,10 +1545,11 @@ const ProjectDetailContent = () => {
           open={hotTaskModalVisible}
           onCancel={() => setHotTaskModalVisible(false)}
           footer={null}
-          width={700}
+          width={modalWidth}
           destroyOnClose
+          centered
         >
-          <div>
+          <div className="hot-task-modal">
             <Alert
               message="CÔNG VIỆC ĐỘT XUẤT - DÀNH CHO MANAGER"
               description="Công việc này sẽ được ưu tiên cao nhất. Hệ thống đã đề xuất các thành viên phù hợp nhất dựa trên kỹ năng và hiệu suất."
@@ -1415,10 +1575,12 @@ const ProjectDetailContent = () => {
               autoAssignToCreator={true}
               isCreatingTask={true}
               parentProjectId={id}
+              isMobile={isMobile}
               customUserSelect={
                 <HotUserSelect
                   placeholder="Chọn thành viên - danh sách đã được xếp hạng theo hiệu suất"
                   style={{ width: "100%" }}
+                  size={isMobile ? "middle" : "large"}
                 />
               }
             />

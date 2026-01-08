@@ -57,7 +57,7 @@ const PosterBell = () => {
         <Badge dot={!isRead} offset={[-2, 2]}>
           <div style={bellButtonStyle}>
             <NotificationOutlined style={iconStyle} />
-            <span style={textStyle}>Thông báo hệ thống</span>
+            <span style={textStyle}>Hệ thống</span>
           </div>
         </Badge>
       </div>

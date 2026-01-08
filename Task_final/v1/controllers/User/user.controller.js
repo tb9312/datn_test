@@ -213,10 +213,33 @@ module.exports.detail = async (req, res) => {
   });
 };
 
+//[GET] /api/v1/users/detail/:id
+module.exports.getUserById = async (req, res) => {
+  try {
+    const find = {
+      deleted: false,
+      _id: req.params.id,
+      status: "active",
+    };
+    const user = await User.findOne(find).select("-password -token");
+    res.json({
+      code: 200,
+      message: "Thành công",
+      data: user,
+    });
+  } catch (error) {
+    res.json({
+      code: 400,
+      message: "Dismiss",
+    });
+  }
+};
+
 //[GET] /api/v3/users/listuser
 module.exports.listuser = async (req, res) => {
   const users = await User.find({
     deleted: false,
+    status: "active",
   }).select("-password -token");
   res.json({
     code: 200,

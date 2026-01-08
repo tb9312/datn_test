@@ -470,6 +470,22 @@ class RAGService {
       return 'task_context';
     }
 
+    // 🔴 PRIORITY 0.8: Suggest Urgent Members - GỢI Ý THÀNH VIÊN CHO CÔNG VIỆC ĐỘT XUẤT
+    // CHECK TRƯỚC personal_task vì "tạo công việc đột xuất" phức tạp hơn "tạo công việc"
+    if (
+      (normalized.includes('goi y') && normalized.includes('thanh vien')) ||
+      (normalized.includes('goi y') && normalized.includes('nguoi')) ||
+      (normalized.includes('cong viec dot xuat') || normalized.includes('cong viec khan cap') || normalized.includes('task hot')) ||
+      (normalized.includes('ai ranh') && (normalized.includes('ngay') || normalized.includes('hom nay') || normalized.includes('ngay mai'))) ||
+      (normalized.includes('thanh vien') && normalized.includes('tham gia') && normalized.includes('cong viec')) ||
+      (normalized.includes('thanh vien co the') && normalized.includes('ngay')) ||
+      (normalized.includes('ai co the') && normalized.includes('tham gia')) ||
+      (normalized.includes('suggest') && normalized.includes('member')) ||
+      (normalized.includes('recommend') && normalized.includes('member'))
+    ) {
+      return 'suggest_urgent_members';
+    }
+
     // 🔴 PRIORITY 1: Personal Task - TẠO TASK (ƯTIÊN NHẤT vì cụ thể)
     if (
       normalized.includes('tao task') ||
@@ -935,7 +951,7 @@ class RAGService {
     console.log('[RAG] Intent:', intent);
 
     // 2. PHÂN QUYỀN THEO ROLE
-    const managerIntents = ['team_members', 'project_stats', 'task_assignment'];
+    const managerIntents = ['team_members', 'project_stats', 'task_assignment', 'suggest_urgent_members'];
     const userOnlyIntents = ['calendar', 'reports']; // Chỉ USER mới có, MANAGER không có
 
     // Kiểm tra quyền truy cập - CHỈ chặn USER truy cập MANAGER features
@@ -983,6 +999,27 @@ class RAGService {
         context: [],
         isSmallTalk: true
       };
+    }
+
+    // 2.10. Suggest Urgent Members - Gợi ý thành viên cho công việc đột xuất
+    if (intent === 'suggest_urgent_members' && userId) {
+      try {
+        const result = await this.generateUrgentMemberSuggestion(userQuery, userId);
+        return {
+          answer: result.answer,
+          sources: [],
+          context: [],
+          isSuggestMembers: true,
+          suggestedMembers: result.members
+        };
+      } catch (error) {
+        console.error('[RAG] Error suggesting urgent members:', error);
+        return {
+          answer: '❌ **Lỗi khi gợi ý thành viên**\n\nĐã xảy ra lỗi khi tìm kiếm thành viên phù hợp. Vui lòng thử lại sau.',
+          sources: [],
+          context: [],
+        };
+      }
     }
 
     // 3. Route theo intent (sau khi đã check quyền)
@@ -2605,6 +2642,308 @@ class RAGService {
     answer += renderSlot('Buổi tối', dailyPlan.evening);
 
     return answer;
+  }
+
+  /**
+   * Parse tên dự án từ query
+   * Ví dụ: "trong dự án ABC", "dự án XYZ"
+   */
+  parseProjectNameFromQuery(query) {
+    // Pattern: "trong dự án X", "dự án X", "project X"
+    const patterns = [
+      /trong\s+d[uự]\s*[aá]n\s+(.+?)(?:\s*,|\s+g[oợ]i\s+[yý]|$)/i,
+      /d[uự]\s*[aá]n\s+(.+?)(?:\s*,|\s+g[oợ]i\s+[yý]|$)/i,
+      /project\s+(.+?)(?:\s*,|\s+suggest|$)/i
+    ];
+
+    for (const pattern of patterns) {
+      const match = query.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Parse ngày từ query
+   * Ví dụ: "ngày 9/1", "ngày 9 tháng 1", "9/1/2026"
+   */
+  parseDateFromQuery(query) {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    
+    // Pattern 1: "ngày DD/MM" hoặc "DD/MM"
+    const pattern1 = query.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+    if (pattern1) {
+      const day = parseInt(pattern1[1]);
+      const month = parseInt(pattern1[2]) - 1; // Month is 0-indexed
+      const year = pattern1[3] ? parseInt(pattern1[3]) : currentYear;
+      return new Date(year, month, day);
+    }
+    
+    // Pattern 2: "ngày DD tháng MM"
+    const pattern2 = query.match(/ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})/i);
+    if (pattern2) {
+      const day = parseInt(pattern2[1]);
+      const month = parseInt(pattern2[2]) - 1;
+      return new Date(currentYear, month, day);
+    }
+    
+    // Pattern 3: "hôm nay"
+    if (query.includes('hôm nay') || query.includes('hom nay')) {
+      return today;
+    }
+    
+    // Pattern 4: "ngày mai"
+    if (query.includes('ngày mai') || query.includes('ngay mai')) {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Lấy danh sách users không có lịch trong ngày và tính điểm ranking
+   * @param {Date} targetDate - Ngày cần kiểm tra
+   * @param {String} projectId - ID dự án (optional) - nếu có thì chỉ lấy members trong dự án, không có thì lấy tất cả
+   */
+  async getUsersAvailableOnDate(targetDate, projectId = null) {
+    const User = require('../../models/user.model');
+    const Calendar = require('../../models/calendar.model');
+    const Project = require('../../models/project.model');
+    const rankingConfig = require('../config/user.ranking.config');
+    const calculateSkillScore = require('../../helpers/ranking/calculateSkillScore.helper');
+    const getCompletionRateByUsers = require('../../helpers/ranking/getCompletionRateByUsers.helper');
+    const getBacklogByUsers = require('../../helpers/ranking/getBacklogByUsers.helper');
+
+    const SKILL_SCORE_MAP = {
+      beginner: 50,
+      intermediate: 75,
+      expert: 100,
+    };
+
+    // 1. Lấy danh sách users
+    let userIds;
+    if (projectId) {
+      // Nếu có projectId, chỉ lấy members trong dự án
+      const project = await Project.findOne({ _id: projectId, deleted: false });
+      if (!project || !project.listUser || project.listUser.length === 0) {
+        return [];
+      }
+      userIds = project.listUser.map(id => id.toString());
+    } else {
+      // Không có projectId, lấy tất cả users active
+      const allUsers = await User.find({ deleted: false, status: 'active' }).lean();
+      userIds = allUsers.map(u => u._id.toString());
+    }
+
+    // 1b. Lấy thông tin users
+    const users = await User.find({ _id: { $in: userIds }, deleted: false, status: 'active' }).lean();
+
+    // 2. Tìm users CÓ lịch trong ngày targetDate
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const busyUsers = await Calendar.find({
+      deleted: false,
+      listUser: { $in: userIds },
+      $or: [
+        { timeStart: { $gte: startOfDay, $lte: endOfDay } },
+        { timeFinish: { $gte: startOfDay, $lte: endOfDay } },
+        {
+          timeStart: { $lte: startOfDay },
+          timeFinish: { $gte: endOfDay }
+        }
+      ]
+    }).distinct('listUser');
+
+    // 3. Filter users KHÔNG có lịch
+    const availableUsers = users.filter(
+      (user) => !busyUsers.some((busyId) => busyId.toString() === user._id.toString())
+    );
+
+    if (availableUsers.length === 0) {
+      return [];
+    }
+
+    // 4. Tính điểm ranking cho available users
+    const availableUserIds = availableUsers.map((u) => u._id);
+    const completionMap = await getCompletionRateByUsers(availableUserIds);
+    const backlogMap = await getBacklogByUsers(availableUserIds);
+
+    const rankedUsers = availableUsers.map((user) => {
+      // Skill score
+      const skillScore = SKILL_SCORE_MAP[user.skills] || 0;
+
+      // Completion rate
+      const completionRate = completionMap[user._id.toString()]?.rate || 0;
+
+      // Backlog penalty
+      const backlogCount = backlogMap[user._id.toString()] || 0;
+      const backlogPenalty = Math.min(
+        backlogCount * rankingConfig.BACKLOG_PENALTY.PER_TASK,
+        rankingConfig.BACKLOG_PENALTY.MAX
+      );
+
+      // Final score
+      const finalScore =
+        skillScore * rankingConfig.WEIGHT.SKILL +
+        completionRate * rankingConfig.WEIGHT.COMPLETION -
+        backlogPenalty;
+
+      return {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        avatar: user.avatar,
+        role: user.role,
+        skills: user.skills,
+        skillScore,
+        completionRate: Math.round(completionRate),
+        backlogCount,
+        backlogPenalty,
+        finalScore: Math.max(0, Math.round(finalScore)),
+      };
+    });
+
+    // 5. Sắp xếp theo finalScore giảm dần
+    rankedUsers.sort((a, b) => b.finalScore - a.finalScore);
+
+    return rankedUsers;
+  }
+
+  /**
+   * Tạo câu trả lời gợi ý thành viên cho công việc đột xuất
+   */
+  async generateUrgentMemberSuggestion(query, userId) {
+    const Project = require('../../models/project.model');
+    
+    // 1. Parse ngày từ query
+    const targetDate = this.parseDateFromQuery(query);
+    
+    if (!targetDate) {
+      return {
+        answer: '❌ **Không xác định được ngày**\n\n' +
+                'Vui lòng chỉ rõ ngày cần tạo công việc đột xuất.\n\n' +
+                '💡 **Ví dụ:**\n' +
+                '• "Gợi ý thành viên cho dự án ABC ngày 9/1"\n' +
+                '• "Ai có thể tham gia công việc trong dự án XYZ ngày mai"\n' +
+                '• "Tạo công việc đột xuất trong dự án ABC ngày 10 tháng 1"',
+        members: []
+      };
+    }
+
+    // 2. Parse tên dự án (BẮT BUỘC)
+    const projectName = this.parseProjectNameFromQuery(query);
+    
+    if (!projectName) {
+      return {
+        answer: '❌ **Vui lòng chỉ định dự án**\n\n' +
+                'Bạn cần chỉ rõ dự án để tạo công việc đột xuất.\n\n' +
+                '💡 **Ví dụ:**\n' +
+                '• "Tạo công việc đột xuất trong dự án [Tên dự án] ngày 9/1"\n' +
+                '• "Gợi ý thành viên cho dự án [Tên dự án] ngày mai"\n' +
+                '• "Ai rảnh cho dự án [Tên dự án] ngày 10/1"',
+        members: []
+      };
+    }
+
+    let projectId = null;
+    let projectTitle = null;
+
+    // Tìm dự án theo tên (fuzzy match với normalize)
+    const normalizedProjectName = this.normalizeQuery(projectName);
+    
+    const projects = await Project.find({
+      deleted: false,
+      projectParentId: { $exists: false } // Chỉ lấy dự án cha
+    }).lean();
+
+    // Fuzzy match
+    const matchedProject = projects.find(p => {
+      const normalizedTitle = this.normalizeQuery(p.title);
+      return normalizedTitle.includes(normalizedProjectName) || 
+             normalizedProjectName.includes(normalizedTitle);
+    });
+
+    if (!matchedProject) {
+      return {
+        answer: `❌ **Không tìm thấy dự án "${projectName}"**\n\n` +
+                `Vui lòng kiểm tra lại tên dự án hoặc hỏi "danh sách dự án" để xem tất cả dự án.`,
+        members: []
+      };
+    }
+
+    projectId = matchedProject._id;
+    projectTitle = matchedProject.title;
+
+    // 3. Lấy danh sách users available và ranked (TẤT CẢ USERS, không filter theo dự án)
+    const rankedUsers = await this.getUsersAvailableOnDate(targetDate, null);
+
+    if (rankedUsers.length === 0) {
+      const dateStr = targetDate.toLocaleDateString('vi-VN');
+      return {
+        answer: `❌ **Không có thành viên rảnh**\n\n` +
+                `Tất cả thành viên đều có lịch vào ngày **${dateStr}**.\n\n` +
+                `💡 Bạn có thể:\n` +
+                `• Chọn ngày khác\n` +
+                `• Xem lịch của từng thành viên để sắp xếp lại\n` +
+                `• Tạo công việc và để hệ thống tự động thông báo`,
+        members: []
+      };
+    }
+
+    // 3. Format câu trả lời
+    const dateStr = targetDate.toLocaleDateString('vi-VN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    let answer = `✅ **Gợi ý thành viên cho công việc đột xuất - ${dateStr}**\n\n`;
+    
+    // Hiển thị tên dự án nếu có
+    if (projectTitle) {
+      answer += `📁 **Dự án:** ${projectTitle}\n\n`;
+    }
+
+    // Mapping skill level sang tiếng Việt
+    const skillLevelMap = {
+      'expert': 'Thành thạo',
+      'intermediate': 'Trung bình',
+      'beginner': 'Mới bắt đầu'
+    };
+
+    // Hiển thị top 5 users
+    const topUsers = rankedUsers.slice(0, 5);
+    topUsers.forEach((user, idx) => {
+      const skillVN = skillLevelMap[user.skills] || user.skills;
+      
+      answer += `**${idx + 1}. ${user.fullName}** (${user.finalScore} điểm)\n`;
+      answer += `   • Kỹ năng: ${skillVN} (${user.skillScore} điểm)\n`;
+      answer += `   • Tỷ lệ hoàn thành: ${user.completionRate}%\n`;
+      answer += `   • Công việc tồn đọng: ${user.backlogCount} task\n`;
+      
+      if (idx === 0) {
+        answer += `   • 💡 **Khuyên dùng** - Thành viên phù hợp nhất\n`;
+      }
+      
+      answer += '\n';
+    });
+    
+    answer += `💡 **Gợi ý:** Chọn người có điểm số cao nhất để đảm bảo công việc được hoàn thành tốt và đúng hạn.`;
+
+    return {
+      answer,
+      members: rankedUsers
+    };
   }
 
   /**

@@ -4,8 +4,10 @@ const PagitationHelper = require("../../../helpers/pagitation");
 const SearchHelper = require("../../../helpers/search");
 const User = require("../../../models/user.model");
 const Team = require("../../../models/team.model");
+const Notification = require("../../../models/notification.model");
 const { updateOverdueProjetcs } = require("../../../helpers/updateOverdue");
 const mongoose = require("mongoose");
+
 //[GET]/api/v3/projects/:parentId/
 module.exports.getTasksByParent = async (req, res) => {
   try {
@@ -188,6 +190,9 @@ module.exports.create = async (req, res) => {
   try {
     session.startTransaction();
 
+    /* =========================
+       1. CREATE PROJECT
+    ========================== */
     const payload = {
       ...req.body,
       createdBy: req.user.id,
@@ -195,16 +200,23 @@ module.exports.create = async (req, res) => {
     };
 
     const [project] = await Project.create([payload], { session });
-    const listUser = Array.isArray(req.body.listUser)
-      ? [...new Set([...req.body.listUser, req.user._id.toString()])]
-      : [req.user._id.toString()];
 
+    /* =========================
+       2. BUILD listUser
+    ========================== */
+    const listUser = Array.isArray(req.body.listUser)
+      ? [...new Set([...req.body.listUser, req.user.id])]
+      : [req.user.id];
+
+    /* =========================
+       3. CREATE TEAM
+    ========================== */
     const [team] = await Team.create(
       [
         {
           project_id: project._id,
           name: project.title,
-          leader: req.user._id,
+          leader: req.user.id,
           description: project.content,
           listUser,
           manager: project.manager,
@@ -213,20 +225,46 @@ module.exports.create = async (req, res) => {
       { session }
     );
 
+    /* =========================
+       4. CREATE NOTIFICATIONS
+    ========================== */
+    const usersToNotify = listUser.filter(
+      (uid) => uid.toString() !== req.user.id.toString()
+    );
+
+    if (usersToNotify.length > 0) {
+      const notifications = usersToNotify.map((uid) => ({
+        user_id: uid,
+        sender: req.user.id,
+        type: "CREATE_PROJECT",
+        title: "Bạn được thêm vào dự án mới",
+        message: `Dự án "${project.title}" vừa được tạo`,
+        url: `/projects/detail/${project._id}`,
+        priority: project.priority || "MEDIUM",
+      }));
+
+      await Notification.insertMany(notifications, { session });
+    }
+
+    /* =========================
+       5. COMMIT
+    ========================== */
     await session.commitTransaction();
 
     return res.status(201).json({
       code: 200,
-      message: "success",
+      success: true,
+      message: "Tạo dự án thành công",
       data: project,
-      team: team,
+      team,
     });
   } catch (error) {
     await session.abortTransaction();
-    console.error(error);
+    console.error("❌ CREATE PROJECT ERROR:", error);
 
     return res.status(500).json({
       code: 500,
+      success: false,
       message: "CREATE_PROJECT_FAILED",
     });
   } finally {
@@ -237,55 +275,99 @@ module.exports.create = async (req, res) => {
 //[PATCH]/api/v3/projects/edit/:id
 module.exports.edit = async (req, res) => {
   try {
-    const id = req.params.id;
-    // console.log(id);
-    const data1 = await Project.findOne({
-      _id: id,
-      deleted: false,
-    });
-    // 1. Kiểm tra project tồn tại
-    const existingProject = await Project.findOne({
-      _id: id,
+    const projectId = req.params.id;
+    const userId = req.user.id;
+
+    /* =========================
+       1. TÌM PROJECT
+    ========================== */
+    const project = await Project.findOne({
+      _id: projectId,
       deleted: false,
     });
 
-    if (!existingProject) {
-      console.log("Project not found");
-      return res.json({
+    if (!project) {
+      return res.status(404).json({
         code: 404,
-        message: "Project not found or deleted",
+        success: false,
+        message: "Không tìm thấy dự án",
       });
     }
-    // 2. Kiểm tra quyền chỉnh sửa (chỉ người tạo được sửa)
-    const createdUser = await User.findOne({
-      _id: existingProject.createdBy,
+
+    /* =========================
+       2. KIỂM TRA QUYỀN
+    ========================== */
+    const isCreator = project.createdBy.toString() === userId;
+    const isManager = project.manager && project.manager.toString() === userId;
+
+    if (!isCreator && !isManager) {
+      return res.status(403).json({
+        code: 403,
+        success: false,
+        message: "Bạn không có quyền chỉnh sửa dự án này",
+      });
+    }
+
+    /* =========================
+       3. CHẶN FIELD KHÔNG ĐƯỢC UPDATE
+    ========================== */
+    const forbiddenFields = ["createdBy", "deleted", "_id"];
+
+    forbiddenFields.forEach((field) => {
+      if (field in req.body) {
+        delete req.body[field];
+      }
     });
 
-    if (!createdUser || createdUser._id.toString() !== req.user.id) {
-      console.log("Permission denied - User is not the creator");
-      return res.json({
-        code: 200,
-        message: "Bạn không phải người tạo dự án, nên không thể sửa",
-      });
-    }
-    const updateResult = await Project.updateOne(
-      { _id: id, deleted: false },
-      { $set: req.body }
+    /* =========================
+       4. UPDATE PROJECT
+    ========================== */
+    await Project.updateOne({ _id: projectId }, { $set: req.body });
+
+    const updatedProject = await Project.findById(projectId);
+
+    /* =========================
+       5. GỬI THÔNG BÁO
+    ========================== */
+    const uniqueUsers = [
+      ...(updatedProject.listUser || []),
+      updatedProject.manager,
+      updatedProject.createdBy,
+    ].filter(Boolean);
+
+    const usersToNotify = uniqueUsers.filter(
+      (uid) => uid.toString() !== userId
     );
-    const updatedProject = await Project.findOne({
-      _id: id,
-      deleted: false,
-    });
-    res.json({
+
+    if (usersToNotify.length > 0) {
+      const notifications = usersToNotify.map((uid) => ({
+        user_id: uid,
+        sender: userId,
+        type: "UPDATE_PROJECT",
+        title: "Dự án vừa được cập nhật",
+        message: `Dự án "${updatedProject.title}" đã được chỉnh sửa`,
+        url: `/projects/detail/${updatedProject._id}`,
+        priority: updatedProject.priority || "MEDIUM",
+      }));
+
+      await Notification.insertMany(notifications);
+    }
+
+    /* =========================
+       6. RESPONSE
+    ========================== */
+    return res.json({
       code: 200,
-      message: "Cập nhật thành công",
+      success: true,
+      message: "Cập nhật dự án thành công",
       data: updatedProject,
     });
   } catch (error) {
-    console.error("Edit error:", error.message);
-    res.json({
-      code: 404,
-      message: "dismiss" + error.message,
+    console.error("❌ EDIT PROJECT ERROR:", error);
+    return res.status(500).json({
+      code: 500,
+      success: false,
+      message: "Lỗi server: " + error.message,
     });
   }
 };

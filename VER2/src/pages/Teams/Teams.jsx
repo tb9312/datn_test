@@ -205,6 +205,7 @@ const Teams = () => {
     });
   };
 
+  // Thêm hàm handleToggleActive
   const handleToggleActive = async (teamId, isActive) => {
     try {
       const response = await teamService.toggleActive(teamId, isActive);
@@ -387,10 +388,15 @@ const Teams = () => {
                 <TeamCard
                   team={team}
                   user={user}
+                  members={users}
                   onView={handleViewTeam}
                   onEdit={handleEditTeam}
                   onDelete={handleDeleteTeam}
                   onChat={handleChatTeam}
+                  onToggleActive={handleToggleActive}
+                  // canEdit={checkTeamPermission(team, 'edit')}
+                  //   canDelete={checkTeamPermission(team, 'delete')}
+                  //   canToggleActive={checkTeamPermission(team, 'toggleActive')}
                 />
               </Col>
             ))}

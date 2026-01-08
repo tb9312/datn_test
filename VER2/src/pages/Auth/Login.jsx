@@ -11,22 +11,19 @@ const LoginContent = () => {
   const navigate = useNavigate();
   const { message: msg } = App.useApp();
   const [loading, setLoading] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState('user');
   const [form] = Form.useForm();
 
   // pages/Auth/Login.jsx - Sửa phần onFinish
 const onFinish = async (values) => {
   setLoading(true);
   
-  const isManager = activeTab === 'manager';
   
   console.log('🔐 Login attempt:', {
     email: values.email,
-    isManagerTab: isManager,
-    activeTab: activeTab
+    role: values.role
   });
   
-  const result = await login(values.email, values.password, isManager);
+  const result = await login(values.email, values.password, values.role);
   
   console.log('📋 Login result:', result);
   
@@ -45,28 +42,28 @@ const onFinish = async (values) => {
   setLoading(false);
 };
 
-  const handleTabChange = (key) => {
-    setActiveTab(key);
-    form.resetFields();
-  };
+  // const handleTabChange = (key) => {
+  //   setActiveTab(key);
+  //   form.resetFields();
+  // };
 
-  const demoAccounts = {
-    user: { 
-      email: 'user@example.com', 
-      password: 'password', 
-      role: 'Người dùng thông thường' 
-    },
-    manager: { 
-      email: 'manager@example.com', 
-      password: 'manager123', 
-      role: 'Quản lý hệ thống' 
-    },
-    admin: { 
-      email: 'admin@example.com', 
-      password: 'admin123', 
-      role: 'Quản trị viên' 
-    }
-  };
+  // const demoAccounts = {
+  //   user: { 
+  //     email: 'user@example.com', 
+  //     password: 'password', 
+  //     role: 'Người dùng thông thường' 
+  //   },
+  //   manager: { 
+  //     email: 'manager@example.com', 
+  //     password: 'manager123', 
+  //     role: 'Quản lý hệ thống' 
+  //   },
+  //   admin: { 
+  //     email: 'admin@example.com', 
+  //     password: 'admin123', 
+  //     role: 'Quản trị viên' 
+  //   }
+  // };
 
   return (
     <div style={{
@@ -85,26 +82,11 @@ const onFinish = async (values) => {
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         }}
       >
-        <Tabs activeKey={activeTab} onChange={handleTabChange}>
-          <TabPane tab="👤 Người Dùng" key="user">
-            <LoginForm 
-              loading={loading} 
-              onFinish={onFinish}
-              form={form}
-              accountInfo={demoAccounts.user}
-              tabType="user"
-            />
-          </TabPane>
-          <TabPane tab="👨‍💼 Quản Lý" key="manager">
-            <LoginForm 
-              loading={loading} 
-              onFinish={onFinish}
-              form={form}
-              accountInfo={demoAccounts.manager}
-              tabType="manager"
-            />
-          </TabPane>
-        </Tabs>
+        <LoginForm 
+          loading={loading} 
+          onFinish={onFinish}
+          form={form}
+        />
 
         <Divider style={{ margin: '16px 0' }} />
 
@@ -117,7 +99,7 @@ const onFinish = async (values) => {
             onClick={() => navigate('/register')}
             style={{ padding: 0 }}
           >
-            Đăng ký tại đây (Chỉ dành cho người dùng)
+            Đăng ký tại đây
           </Button>
           <br />
           <Button 
@@ -155,7 +137,7 @@ const onFinish = async (values) => {
   );
 };
 
-const LoginForm = ({ loading, onFinish, form, accountInfo, tabType }) => {
+const LoginForm = ({ loading, onFinish, form }) => {
   return (
     <Form
       form={form}
@@ -171,7 +153,7 @@ const LoginForm = ({ loading, onFinish, form, accountInfo, tabType }) => {
           { required: true, message: 'Vui lòng nhập email!' },
           { type: 'email', message: 'Email không hợp lệ!' }
         ]}
-        initialValue={accountInfo.email}
+        
       >
         <Input 
           prefix={<MailOutlined />} 
@@ -183,7 +165,7 @@ const LoginForm = ({ loading, onFinish, form, accountInfo, tabType }) => {
         label="Mật Khẩu"
         name="password"
         rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
-        initialValue={accountInfo.password}
+        
       >
         <Input.Password
           prefix={<LockOutlined />}
@@ -198,7 +180,7 @@ const LoginForm = ({ loading, onFinish, form, accountInfo, tabType }) => {
           style={{ width: '100%' }}
           loading={loading}
         >
-          {tabType === 'manager' ? 'Đăng Nhập (Quản Lý)' : 'Đăng Nhập (Người Dùng)'}
+          Đăng Nhập
         </Button>
       </Form.Item>
     </Form>

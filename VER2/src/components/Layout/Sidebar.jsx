@@ -69,11 +69,11 @@ const Sidebar = ({ collapsed }) => {
         icon: <CalendarOutlined />,
         label: "Lịch",
       },
-      {
-        key: "/reports",
-        icon: <BarChartOutlined />,
-        label: "Báo Cáo",
-      },
+      //{
+        //key: "/reports",
+        //icon: <BarChartOutlined />,
+        //label: "Báo Cáo",
+      //},
     ];
   }
   // User thường

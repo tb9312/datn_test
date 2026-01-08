@@ -8,7 +8,7 @@ route.get("/detail/:id", controller.detail);
 
 route.post("/create", controller.create);
 
-route.patch("/edit", controller.edit);
+route.patch("/edit/:id", controller.edit);
 
 route.patch("/delete/:id", controller.delete);
 

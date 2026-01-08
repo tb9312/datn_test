@@ -75,8 +75,9 @@ const userService = {
   // Lấy user by id
   async getUserById(id) {
     try {
-      const response = await apiClient.get(`/users/${id}`);
-      return response;
+      const response = await apiClient.get(`/users/detail/${id}`);
+      console.log('✅ getUserById Response:', response);
+      return response.data;
     } catch (error) {
       throw this.handleError(error);
     }

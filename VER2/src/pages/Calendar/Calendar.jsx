@@ -23,7 +23,8 @@ import {
   ClockCircleOutlined,
   UserOutlined,
   EnvironmentOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  WarningFilled
 } from '@ant-design/icons';
 import CalendarView from '../../components/Calendar/CalendarView';
 import EventForm from '../../components/Calendar/EventForm';
@@ -31,6 +32,7 @@ import PermissionWrapper from '../../components/Common/PermissionWrapper';
 import { calendarService } from '../../services/calendarService';
 import userService from '../../services/userService';
 import { useAuth } from '../../contexts/AuthContext';
+
 import dayjs from 'dayjs';
 const { Title } = Typography;
 
@@ -89,7 +91,11 @@ const CalendarPage = () => {
       
       if (date) {
         params.date = date.toISOString().split('T')[0];
-      }
+      } else {
+      // Khi không có date, lấy tất cả events
+      params.limit = 100;  // 👈 Thêm limit lớn
+      params.page = 1;
+    }
       
       const response = await calendarService.getEvents(params);
       
@@ -203,6 +209,122 @@ const CalendarPage = () => {
       }
     }
   }, [users, events, mapUserInfoToEvents]);
+  // Hiển thị thông tin sự kiện trùng lịch
+  const showConflictModal = (response) => {
+  const { message, data } = response;
+  
+  // Tách message thành các dòng
+  const messageLines = message.split('\n');
+  
+  Modal.error({
+    title: '⛔ Xung đột lịch',
+    content: (
+      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div style={{ 
+          background: '#fff2f0', 
+          border: '1px solid #ffccc7',
+          padding: '12px',
+          borderRadius: '6px',
+          marginBottom: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <WarningFilled style={{ color: '#ff4d4f', fontSize: '18px', marginTop: '2px' }} />
+            <div>
+              {messageLines.map((line, index) => (
+                <p key={index} style={{ 
+                  margin: index === 0 ? '0 0 4px 0' : '4px 0', 
+                  color: '#333',
+                  fontWeight: index === 0 ? 500 : 400
+                }}>
+                  {line}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {data && data.conflictTime && (
+          <div style={{ 
+            background: '#f6ffed', 
+            border: '1px solid #b7eb8f',
+            padding: '12px',
+            borderRadius: '6px',
+            marginTop: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <CalendarOutlined style={{ color: '#52c41a', fontSize: '16px', marginTop: '2px' }} />
+              <div>
+                <p style={{ margin: '0 0 8px 0', fontWeight: 500, color: '#333' }}>
+                  Chi tiết sự kiện trùng:
+                </p>
+                <div style={{ 
+                  background: 'white', 
+                  padding: '10px', 
+                  borderRadius: '4px',
+                  border: '1px dashed #d9d9d9'
+                }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '15px' }}>
+                    <strong>📌 {data.conflictTitle}</strong>
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <ClockCircleOutlined style={{ color: '#1890ff' }} />
+                    <span style={{ fontSize: '14px' }}>
+                      {new Date(data.conflictTime.start).toLocaleString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })} - {new Date(data.conflictTime.end).toLocaleString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  {data.conflictWithUsers && data.conflictWithUsers.length > 0 && (
+                    <div style={{ 
+                      background: '#fff7e6', 
+                      padding: '6px 8px', 
+                      borderRadius: '4px',
+                      marginTop: '8px',
+                      fontSize: '13px'
+                    }}>
+                      <TeamOutlined style={{ marginRight: '4px', color: '#fa8c16' }} />
+                      Có {data.conflictWithUsers.length} thành viên khác cũng bị trùng lịch
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div style={{ 
+          marginTop: '16px', 
+          padding: '10px',
+          background: '#f0f7ff',
+          borderRadius: '4px',
+          borderLeft: '3px solid #1890ff'
+        }}>
+          <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#666' }}>
+            <InfoCircleOutlined style={{ marginRight: '6px' }} />
+            <strong>Gợi ý:</strong> Hãy chọn thời gian khác hoặc thay đổi thành viên tham gia
+          </p>
+        </div>
+      </div>
+    ),
+    okText: 'Đã hiểu',
+    okType: 'primary',
+    width: 500,
+    centered: true,
+    onOk: () => {
+      // Có thể thêm logic redirect đến sự kiện conflict
+      if (data && data.conflictId) {
+        console.log('Redirect to conflict event:', data.conflictId);
+      }
+    }
+  });
+};
 
   // Tạo sự kiện mới
   const handleCreateEvent = async (values) => {
@@ -228,21 +350,35 @@ const CalendarPage = () => {
       console.log('📥 Create event response:', response);
       
       if (response.code === 201) {
-        // Reload events
-        await loadEvents();
-        message.success('Tạo sự kiện thành công!');
-        setModalVisible(false);
-      } else {
-        message.error(response.message || 'Tạo sự kiện thất bại');
-      }
-    } catch (error) {
-      console.error('❌ Error creating event:', error);
-      message.error(error.message || 'Tạo sự kiện thất bại');
-    } finally {
-      setLoading(false);
+      // Reload events
+      await loadEvents();
+      message.success({
+        content: '✅ Tạo sự kiện thành công!',
+        duration: 3,
+        style: {
+          marginTop: '50px',
+        },
+      });
+      setModalVisible(false);
+    } else if (response.code === 400) {
+      // Hiển thị conflict modal chi tiết
+      showConflictModal(response);
+    } else {
+      message.error({
+        content: `❌ ${response.message || 'Tạo sự kiện thất bại'}`,
+        duration: 5,
+      });
     }
-  };
-
+  } catch (error) {
+    console.error('❌ Error creating event:', error);
+    message.error({
+      content: `❌ ${error.message || 'Tạo sự kiện thất bại'}`,
+      duration: 5,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
   // Cập nhật sự kiện
   const handleUpdateEvent = async (values) => {
     if (!editingEvent) return;
@@ -269,21 +405,36 @@ const CalendarPage = () => {
       console.log('📥 Update event response:', response);
       
       if (response.code === 200) {
-        // Reload events
-        await loadEvents();
-        message.success('Cập nhật sự kiện thành công!');
-        setModalVisible(false);
-        setEditingEvent(null);
-      } else {
-        message.error(response.message || 'Cập nhật sự kiện thất bại');
-      }
-    } catch (error) {
-      console.error('❌ Error updating event:', error);
-      message.error(error.message || 'Cập nhật sự kiện thất bại');
-    } finally {
-      setLoading(false);
+      // Reload events
+      await loadEvents();
+      message.success({
+        content: '✅ Cập nhật sự kiện thành công!',
+        duration: 3,
+        style: {
+          marginTop: '50px',
+        },
+      });
+      setModalVisible(false);
+      setEditingEvent(null);
+    } else if (response.code === 400) {
+      // Hiển thị conflict modal cho update
+      showConflictModal(response);
+    } else {
+      message.error({
+        content: `❌ ${response.message || 'Cập nhật sự kiện thất bại'}`,
+        duration: 5,
+      });
     }
-  };
+  } catch (error) {
+    console.error('❌ Error updating event:', error);
+    message.error({
+      content: `❌ ${error.message || 'Cập nhật sự kiện thất bại'}`,
+      duration: 5,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Xóa sự kiện
   const handleDeleteEvent = async (eventId) => {

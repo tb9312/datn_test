@@ -112,7 +112,7 @@ module.exports.listuserHot = async (req, res) => {
     }
 
     // 2. Lấy danh sách user
-    const users = await User.find({ deleted: false }).lean();
+    const users = await User.find({ deleted: false, status: "active" }).lean();
     const userIds = users.map((u) => u._id);
 
     // 3. Lấy completion & backlog

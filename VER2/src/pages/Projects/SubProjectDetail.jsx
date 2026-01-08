@@ -1,4 +1,4 @@
-// pages/Projects/SubProjectDetail.jsx
+// pages/Projects/SubProjectDetail.jsx - ĐÃ FIX RESPONSIVE
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -23,6 +23,9 @@ import {
   Divider,
   Timeline,
   Modal,
+  Alert,
+  Badge,
+  Progress
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -47,6 +50,11 @@ import {
   FileTextOutlined,
   HistoryOutlined,
   LinkOutlined,
+  MoreOutlined,
+  EyeOutlined,
+  FileOutlined,
+  DownloadOutlined,
+  PaperClipOutlined
 } from "@ant-design/icons";
 import moment from "moment";
 import { useAuth } from "../../contexts/AuthContext";
@@ -54,7 +62,9 @@ import projectService from "../../services/projectService";
 import userService from "../../services/userService";
 import ProjectForm from "../../components/Projects/ProjectForm";
 import hotProjectService from "../../services/hotProjectService";
-const { Title, Text } = Typography;
+import { useResponsive, getModalWidth, getAvatarSize } from "../../utils/responsiveUtils";
+
+const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
 
@@ -62,6 +72,8 @@ const SubProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isMobile, isTablet, isDesktop } = useResponsive();
+  const { modal } = App.useApp();
   const [task, setTask] = useState(null);
   const [parentProject, setParentProject] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +89,8 @@ const SubProjectDetail = () => {
   const [refusing, setRefusing] = useState(false);
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   // Lấy parentProjectId từ state hoặc từ task data
   const parentProjectId = location.state?.parentProjectId;
@@ -84,6 +98,7 @@ const SubProjectDetail = () => {
   console.log("=== DEBUG SUBPROJECT DETAIL ===");
   console.log("Task ID:", id);
   console.log("Parent Project ID from state:", parentProjectId);
+  console.log("Is Mobile:", isMobile, "Is Tablet:", isTablet);
 
   useEffect(() => {
     if (id) {
@@ -109,6 +124,21 @@ const SubProjectDetail = () => {
     } catch (error) {
       console.error("❌ Error loading comments:", error);
       setComments([]);
+    }
+  };
+
+  // Load attachments
+  const loadAttachments = async () => {
+    try {
+      // Giả sử bạn có API endpoint cho attachments
+      // const response = await projectService.getAttachments(id);
+      // setAttachments(response.data || []);
+      
+      // Tạm thời set empty array
+      setAttachments([]);
+    } catch (error) {
+      console.error("❌ Error loading attachments:", error);
+      setAttachments([]);
     }
   };
 
@@ -150,6 +180,9 @@ const SubProjectDetail = () => {
       if (usersResponse.success) {
         setUsers(usersResponse.data || []);
       }
+
+      // 5. Load attachments
+      await loadAttachments();
     } catch (error) {
       console.error("Error loading task detail:", error);
       message.error("Không thể tải chi tiết công việc");
@@ -437,6 +470,28 @@ const SubProjectDetail = () => {
     }
   };
 
+  // Hàm upload attachment
+  const handleUploadAttachment = async (file) => {
+    try {
+      setUploading(true);
+      // Giả sử bạn có API endpoint để upload
+      // const formData = new FormData();
+      // formData.append('file', file);
+      // const response = await projectService.uploadAttachment(id, formData);
+      
+      // if (response.success) {
+      //   message.success('Tải lên tệp thành công!');
+      //   loadAttachments();
+      // }
+      
+      message.info('Tính năng upload file đang được phát triển');
+    } catch (error) {
+      message.error('Tải lên tệp thất bại: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       "not-started": "default",
@@ -537,17 +592,22 @@ const SubProjectDetail = () => {
   const assignee = getUserInfo(task.assignee_id);
   const isTaskCreator = task.createdBy === user?.id;
 
+  // Responsive settings
+  const modalWidth = getModalWidth(isMobile, isTablet, isDesktop);
+  const avatarSize = getAvatarSize(isMobile, isTablet);
+
   return (
     <App>
-      <div>
+      <div className="subproject-detail-page">
         {/* Breadcrumb với hierarchical navigation */}
         <Breadcrumb style={{ marginBottom: 16 }}>
           <Breadcrumb.Item>
             <a
               onClick={() => navigate("/projects")}
               style={{ cursor: "pointer" }}
+              className="breadcrumb-link"
             >
-              <ProjectOutlined /> Dự án
+              <ProjectOutlined /> {isMobile ? "Dự án" : "Dự án"}
             </a>
           </Breadcrumb.Item>
 
@@ -558,157 +618,175 @@ const SubProjectDetail = () => {
                   navigate(`/projects/detail/${parentProject._id}`)
                 }
                 style={{ cursor: "pointer" }}
+                className="breadcrumb-link"
               >
-                <FileTextOutlined /> {parentProject.title}
+                <FileTextOutlined /> {isMobile && parentProject.title.length > 20 
+                  ? parentProject.title.substring(0, 20) + "..." 
+                  : parentProject.title}
               </a>
             </Breadcrumb.Item>
           )}
 
           <Breadcrumb.Item>
-            <strong style={{ color: "#1890ff" }}>
-              <TagOutlined /> {task.title}
+            <strong style={{ color: "#1890ff" }} className="breadcrumb-current">
+              <TagOutlined /> {isMobile && task.title.length > 20 
+                ? task.title.substring(0, 20) + "..." 
+                : task.title}
             </strong>
           </Breadcrumb.Item>
         </Breadcrumb>
 
         {/* Header Card */}
-        <Card style={{ marginBottom: 16 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <Title level={2} style={{ margin: 0, marginRight: 16 }}>
-                  {task.title}
+        <Card className="subproject-header-card">
+          <div className="subproject-header-content">
+            <div className="subproject-header-info">
+              <div className="subproject-title-section">
+                <Title level={isMobile ? 3 : 2} style={{ margin: 0, marginRight: 16 }} className="subproject-title">
+                  {isMobile && task.title.length > 30 
+                    ? task.title.substring(0, 30) + "..." 
+                    : task.title}
                 </Title>
-                <Space>
-                  <Tag
-                    color={getStatusColor(task.status)}
-                    icon={getStatusIcon(task.status)}
-                  >
-                    {getStatusText(task.status)}
-                  </Tag>
-                  {/* THÊM badge công việc đột xuất */}
-                  {task.statusHot && (
-                    <Tag color="red" icon={<FireOutlined />}>
-                      Công việc đột xuất
+                <div className="subproject-tags">
+                  <Space wrap size={isMobile ? 4 : 8}>
+                    <Tag
+                      color={getStatusColor(task.status)}
+                      icon={getStatusIcon(task.status)}
+                      size={isMobile ? "small" : "default"}
+                    >
+                      {getStatusText(task.status)}
                     </Tag>
-                  )}
-                  <Tag color={getPriorityColor(task.priority)}>
-                    {task.priority === "high"
-                      ? "Ưu tiên cao"
-                      : task.priority === "medium"
-                      ? "Ưu tiên trung bình"
-                      : "Ưu tiên thấp"}
-                  </Tag>
-                  {task.tag && (
-                    <Tag color="purple" icon={<TagOutlined />}>
-                      {task.tag === "bug"
-                        ? "🐛 Bug fix"
-                        : task.tag === "feature"
-                        ? "✨ Tính năng mới"
-                        : task.tag === "improvement"
-                        ? "🚀 Cải tiến"
-                        : task.tag === "documentation"
-                        ? "📚 Tài liệu"
-                        : task.tag === "design"
-                        ? "🎨 Thiết kế"
-                        : task.tag === "test"
-                        ? "🧪 Kiểm thử"
-                        : task.tag}
+                    {/* THÊM badge công việc đột xuất */}
+                    {task.statusHot && (
+                      <Tag color="red" icon={<FireOutlined />} size={isMobile ? "small" : "default"}>
+                        {isMobile ? "Đột xuất" : "Công việc đột xuất"}
+                      </Tag>
+                    )}
+                    <Tag color={getPriorityColor(task.priority)} size={isMobile ? "small" : "default"}>
+                      {task.priority === "high"
+                        ? "Ưu tiên cao"
+                        : task.priority === "medium"
+                        ? "Ưu tiên trung bình"
+                        : "Ưu tiên thấp"}
                     </Tag>
-                  )}
-                </Space>
+                    {task.tag && (
+                      <Tag color="purple" icon={<TagOutlined />} size={isMobile ? "small" : "default"}>
+                        {task.tag === "bug"
+                          ? "🐛 Bug fix"
+                          : task.tag === "feature"
+                          ? "✨ Tính năng mới"
+                          : task.tag === "improvement"
+                          ? "🚀 Cải tiến"
+                          : task.tag === "documentation"
+                          ? "📚 Tài liệu"
+                          : task.tag === "design"
+                          ? "🎨 Thiết kế"
+                          : task.tag === "test"
+                          ? "🧪 Kiểm thử"
+                          : task.tag}
+                      </Tag>
+                    )}
+                  </Space>
+                </div>
               </div>
 
-              <Text
-                style={{ color: "#666", fontSize: "16px", lineHeight: "1.6" }}
+              <Paragraph
+                className="subproject-description"
+                style={{ 
+                  color: "#666", 
+                  fontSize: isMobile ? "14px" : "16px", 
+                  lineHeight: "1.6",
+                  marginBottom: isMobile ? 8 : 12
+                }}
               >
                 {task.content}
-              </Text>
+              </Paragraph>
             </div>
 
-            <Space>
-              {/* Nút quay về parent project */}
-              {parentProject && (
-                <Button
-                  icon={<ArrowLeftOutlined />}
-                  onClick={() =>
-                    navigate(`/projects/detail/${parentProject._id}`)
-                  }
-                >
-                  Về dự án
-                </Button>
-              )}
-
-              {/* Nút thay đổi trạng thái */}
-              {canEditTask() &&
-                task.status !== "completed" &&
-                task.status !== "cancelled" && (
+            <div className="subproject-action-buttons">
+              <Space direction={isMobile ? "vertical" : "horizontal"} style={{ width: isMobile ? "100%" : "auto" }}>
+                {/* Nút quay về parent project */}
+                {parentProject && (
                   <Button
-                    type="primary"
-                    onClick={() => {
-                      if (task.status === "not-started") {
-                        handleChangeStatus("in-progress");
-                      } else if (task.status === "in-progress") {
-                        handleChangeStatus("completed");
-                      } else if (task.status === "on-hold") {
-                        handleChangeStatus("in-progress");
-                      }
-                    }}
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() =>
+                      navigate(`/projects/detail/${parentProject._id}`)
+                    }
+                    size={isMobile ? "middle" : "large"}
+                    block={isMobile}
                   >
-                    {task.status === "not-started"
-                      ? "Bắt đầu"
-                      : task.status === "in-progress"
-                      ? "Hoàn thành"
-                      : task.status === "on-hold"
-                      ? "Tiếp tục"
-                      : "Cập nhật"}
+                    {isMobile ? "Về dự án" : "Về dự án"}
                   </Button>
                 )}
 
-              {/* Nút sửa */}
-              {canEditTask() && (
-                <Button
-                  icon={<EditOutlined />}
-                  onClick={() => handleEditTask(task)}
-                >
-                  Sửa
-                </Button>
-              )}
+                {/* Nút thay đổi trạng thái */}
+                {canEditTask() &&
+                  task.status !== "completed" &&
+                  task.status !== "cancelled" && (
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        if (task.status === "not-started") {
+                          handleChangeStatus("in-progress");
+                        } else if (task.status === "in-progress") {
+                          handleChangeStatus("completed");
+                        } else if (task.status === "on-hold") {
+                          handleChangeStatus("in-progress");
+                        }
+                      }}
+                      size={isMobile ? "middle" : "large"}
+                      block={isMobile}
+                    >
+                      {task.status === "not-started"
+                        ? "Bắt đầu"
+                        : task.status === "in-progress"
+                        ? "Hoàn thành"
+                        : task.status === "on-hold"
+                        ? "Tiếp tục"
+                        : "Cập nhật"}
+                    </Button>
+                  )}
 
-              {/* Nút xóa */}
-              {canEditTask() && (
-                <Popconfirm
-                  title="Xóa công việc"
-                  description="Bạn có chắc chắn muốn xóa công việc này?"
-                  onConfirm={handleDeleteTask}
-                  okText="Xóa"
-                  cancelText="Hủy"
-                  okType="danger"
-                >
-                  <Button icon={<DeleteOutlined />} danger>
-                    Xóa
+                {/* Nút sửa */}
+                {canEditTask() && (
+                  <Button
+                    icon={<EditOutlined />}
+                    onClick={() => handleEditTask(task)}
+                    size={isMobile ? "middle" : "large"}
+                    block={isMobile}
+                  >
+                    {isMobile ? "Sửa" : "Chỉnh sửa"}
                   </Button>
-                </Popconfirm>
-              )}
-            </Space>
+                )}
+
+                {/* Nút xóa */}
+                {canEditTask() && (
+                  <Popconfirm
+                    title="Xóa công việc"
+                    description="Bạn có chắc chắn muốn xóa công việc này?"
+                    onConfirm={handleDeleteTask}
+                    okText="Xóa"
+                    cancelText="Hủy"
+                    okType="danger"
+                  >
+                    <Button 
+                      icon={<DeleteOutlined />} 
+                      danger
+                      size={isMobile ? "middle" : "large"}
+                      block={isMobile}
+                    >
+                      {isMobile ? "Xóa" : "Xóa"}
+                    </Button>
+                  </Popconfirm>
+                )}
+              </Space>
+            </div>
           </div>
         </Card>
 
         {/* Parent Project Info (nếu có) */}
         {parentProject && (
           <Card
+            className="parent-project-info-card"
             style={{
               marginBottom: 16,
               backgroundColor: "#f6ffed",
@@ -716,12 +794,13 @@ const SubProjectDetail = () => {
             }}
             size="small"
           >
-            <Space>
+            <div className="parent-project-info">
               <Avatar
                 icon={<ProjectOutlined />}
+                size={isMobile ? "small" : "default"}
                 style={{ backgroundColor: "#52c41a" }}
               />
-              <div style={{ flex: 1 }}>
+              <div className="parent-project-details">
                 <Text strong>Thuộc dự án: </Text>
                 <LinkOutlined style={{ margin: "0 8px", color: "#1890ff" }} />
                 <a
@@ -729,10 +808,13 @@ const SubProjectDetail = () => {
                     navigate(`/projects/detail/${parentProject._id}`)
                   }
                   style={{ cursor: "pointer", color: "#1890ff" }}
+                  className="parent-project-link"
                 >
-                  {parentProject.title}
+                  {isMobile && parentProject.title.length > 25
+                    ? parentProject.title.substring(0, 25) + "..."
+                    : parentProject.title}
                 </a>
-                <Text type="secondary" style={{ marginLeft: 16 }}>
+                <Text type="secondary" style={{ marginLeft: 16, fontSize: isMobile ? 12 : 14 }}>
                   Quản lý:{" "}
                   {getUserInfo(parentProject.createdBy)?.fullName ||
                     parentProject.createdBy}
@@ -743,28 +825,182 @@ const SubProjectDetail = () => {
                 onClick={() =>
                   navigate(`/projects/detail/${parentProject._id}`)
                 }
+                className="view-parent-btn"
               >
-                Xem dự án
+                {isMobile ? "Xem" : "Xem dự án"}
               </Button>
-            </Space>
+            </div>
           </Card>
         )}
 
-        <Row gutter={[16, 16]}>
+        {/* Thông tin công việc đột xuất */}
+        {task.statusHot && (
+          <Card
+            className="hot-task-info-card"
+            title={
+              <Space>
+                <FireOutlined style={{ color: "#ff4d4f" }} />
+                <span>{isMobile ? "CV đột xuất" : "Thông tin công việc đột xuất"}</span>
+              </Space>
+            }
+            style={{
+              marginBottom: 16,
+              borderColor: "#ffccc7",
+              backgroundColor: "#fff2e8",
+            }}
+            size="small"
+          >
+            <div className="hot-task-info-content">
+              <div className="hot-task-status" style={{ marginBottom: 12 }}>
+                <Text strong>Trạng thái: </Text>
+                {task.assignee_id ? (
+                  <Space>
+                    <Tag color="green" size={isMobile ? "small" : "default"}>
+                      <CheckCircleOutlined /> {isMobile ? "Có PT" : "Đã có người phụ trách"}
+                    </Tag>
+                    <Avatar
+                      size={isMobile ? "small" : "default"}
+                      src={getUserInfo(task.assignee_id)?.avatar}
+                      style={{ marginLeft: 8 }}
+                    />
+                    <Text style={{ fontSize: isMobile ? 12 : 14 }}>
+                      {getUserInfo(task.assignee_id)?.fullName ||
+                        task.assignee_id}
+                    </Text>
+                  </Space>
+                ) : (
+                  <Tag color="orange" size={isMobile ? "small" : "default"}>
+                    <ClockCircleOutlined /> {isMobile ? "Chờ xác nhận" : "Đang chờ xác nhận"}
+                  </Tag>
+                )}
+              </div>
+
+              <div className="hot-task-members" style={{ marginBottom: 12 }}>
+                <Text strong>Thành viên được mời: </Text>
+                <div style={{ marginTop: 8 }}>
+                  {task.listUser && task.listUser.length > 0 ? (
+                    <Space wrap>
+                      {task.listUser.map((userId) => {
+                        const userInfo = getUserInfo(userId);
+                        if (!userInfo) return null;
+
+                        const isAssigned = task.assignee_id === userId;
+                        const isCurrentUser = userId === user?.id;
+
+                        return (
+                          <Tag
+                            key={userId}
+                            color={
+                              isAssigned
+                                ? "green"
+                                : isCurrentUser
+                                ? "blue"
+                                : "default"
+                            }
+                            icon={
+                              isAssigned ? (
+                                <CheckCircleOutlined />
+                              ) : (
+                                <UserOutlined />
+                              )
+                            }
+                            size={isMobile ? "small" : "default"}
+                          >
+                            <Avatar
+                              size="small"
+                              src={userInfo.avatar}
+                              style={{ marginRight: 4 }}
+                            />
+                            {isMobile 
+                              ? userInfo.fullName.substring(0, 10) + (userInfo.fullName.length > 10 ? "..." : "")
+                              : userInfo.fullName}
+                            {isAssigned && !isMobile && " (Phụ trách)"}
+                            {isCurrentUser && !isAssigned && " (Bạn)"}
+                          </Tag>
+                        );
+                      })}
+                    </Space>
+                  ) : (
+                    <Text type="secondary">Chưa có thành viên nào</Text>
+                  )}
+                </div>
+              </div>
+
+              {/* Button từ chối chỉ hiển thị nếu user có quyền */}
+              {canRefuseTask() && (
+                <div
+                  className="refuse-task-section"
+                  style={{
+                    marginTop: 16,
+                    paddingTop: 12,
+                    borderTop: "1px solid #ffccc7",
+                    textAlign: "center",
+                  }}
+                >
+                  <Text
+                    type="secondary"
+                    style={{ display: "block", marginBottom: 8, fontSize: isMobile ? 12 : 14 }}
+                  >
+                    Bạn được mời tham gia công việc đột xuất này
+                  </Text>
+
+                  <Popconfirm
+                    title="Từ chối tham gia"
+                    description={
+                      <div>
+                        <p>
+                          Bạn có chắc chắn muốn từ chối tham gia công việc
+                          này?
+                        </p>
+                        <p style={{ fontSize: "12px", color: "#666" }}>
+                          Manager sẽ nhận được thông báo và có thể chọn người
+                          khác.
+                        </p>
+                      </div>
+                    }
+                    onConfirm={handleRefuseTask}
+                    okText="Từ chối"
+                    cancelText="Hủy"
+                    okType="danger"
+                    disabled={refusing}
+                  >
+                    <Button
+                      icon={<CloseCircleOutlined />}
+                      danger
+                      loading={refusing}
+                      size={isMobile ? "middle" : "default"}
+                    >
+                      {isMobile ? "Từ chối" : "Từ chối tham gia"}
+                    </Button>
+                  </Popconfirm>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        <Row gutter={[16, 16]} className="subproject-detail-row">
           {/* Left Column - Task Info */}
-          <Col xs={24} lg={8}>
-            <Card title="Thông tin công việc" style={{ marginBottom: 16 }}>
-              <Descriptions column={1} size="small">
+          <Col xs={24} md={8} lg={8} xl={7} className="task-info-sidebar">
+            <Card className="task-info-card" style={{ marginBottom: 16 }}>
+              <div className="card-header">
+                <Title level={isMobile ? 5 : 4} style={{ margin: 0 }}>
+                  {isMobile ? "Thông tin" : "Thông tin công việc"}
+                </Title>
+              </div>
+              <Descriptions column={1} size="small" className="task-info-list">
                 {taskCreator && (
                   <Descriptions.Item label="Người tạo">
                     <Space>
                       <Avatar
-                        size="small"
+                        size={isMobile ? "small" : "default"}
                         src={taskCreator?.avatar}
                         icon={<UserOutlined />}
                       />
-                      <span>
-                        {taskCreator?.fullName || task.createdBy}
+                      <div className="user-info">
+                        <span className="user-name">
+                          {taskCreator?.fullName || task.createdBy}
+                        </span>
                         {isTaskCreator && (
                           <Tag
                             color="green"
@@ -774,7 +1010,7 @@ const SubProjectDetail = () => {
                             Bạn
                           </Tag>
                         )}
-                      </span>
+                      </div>
                     </Space>
                   </Descriptions.Item>
                 )}
@@ -783,12 +1019,14 @@ const SubProjectDetail = () => {
                   <Descriptions.Item label="Người thực hiện">
                     <Space>
                       <Avatar
-                        size="small"
+                        size={isMobile ? "small" : "default"}
                         src={assignee?.avatar}
                         icon={<UserOutlined />}
                       />
-                      <span>
-                        {assignee?.fullName || task.assignee_id}
+                      <div className="user-info">
+                        <span className="user-name">
+                          {assignee?.fullName || task.assignee_id}
+                        </span>
                         {assignee?._id === user?.id && (
                           <Tag
                             color="blue"
@@ -798,7 +1036,7 @@ const SubProjectDetail = () => {
                             Bạn
                           </Tag>
                         )}
-                      </span>
+                      </div>
                     </Space>
                   </Descriptions.Item>
                 )}
@@ -808,7 +1046,7 @@ const SubProjectDetail = () => {
                     <CalendarOutlined />
                     <span>
                       {task.timeStart
-                        ? moment(task.timeStart).format("DD/MM/YYYY")
+                        ? moment(task.timeStart).format(isMobile ? "DD/MM" : "DD/MM/YYYY")
                         : "Chưa có"}
                     </span>
                   </Space>
@@ -819,7 +1057,7 @@ const SubProjectDetail = () => {
                     <CalendarOutlined />
                     <span>
                       {task.timeFinish
-                        ? moment(task.timeFinish).format("DD/MM/YYYY")
+                        ? moment(task.timeFinish).format(isMobile ? "DD/MM" : "DD/MM/YYYY")
                         : "Chưa có"}
                     </span>
                   </Space>
@@ -835,189 +1073,64 @@ const SubProjectDetail = () => {
                 )}
 
                 <Descriptions.Item label="Ngày tạo">
-                  {moment(task.createdAt).format("DD/MM/YYYY HH:mm")}
+                  {moment(task.createdAt).format(isMobile ? "DD/MM HH:mm" : "DD/MM/YYYY HH:mm")}
                 </Descriptions.Item>
               </Descriptions>
             </Card>
-            {/* Thêm phần này sau Card "Thông tin công việc" và trước "Team Members" */}
 
-            {/* Thông tin công việc đột xuất */}
-            {task.statusHot && (
-              <Card
-                title={
-                  <Space>
-                    <FireOutlined style={{ color: "#ff4d4f" }} />
-                    <span>Thông tin công việc đột xuất</span>
-                  </Space>
-                }
-                style={{
-                  marginBottom: 16,
-                  borderColor: "#ffccc7",
-                  backgroundColor: "#fff2e8",
-                }}
-                size="small"
-              >
-                <div style={{ marginBottom: 12 }}>
-                  <Text strong>Trạng thái: </Text>
-                  {task.assignee_id ? (
-                    <Space>
-                      <Tag color="green">
-                        <CheckCircleOutlined /> Đã có người phụ trách
-                      </Tag>
-                      <Avatar
-                        size="small"
-                        src={getUserInfo(task.assignee_id)?.avatar}
-                        style={{ marginLeft: 8 }}
-                      />
-                      <Text>
-                        {getUserInfo(task.assignee_id)?.fullName ||
-                          task.assignee_id}
-                      </Text>
-                    </Space>
-                  ) : (
-                    <Tag color="orange">
-                      <ClockCircleOutlined /> Đang chờ xác nhận
-                    </Tag>
-                  )}
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <Text strong>Thành viên được mời: </Text>
-                  <div style={{ marginTop: 8 }}>
-                    {task.listUser && task.listUser.length > 0 ? (
-                      <Space wrap>
-                        {task.listUser.map((userId) => {
-                          const userInfo = getUserInfo(userId);
-                          if (!userInfo) return null;
-
-                          const isAssigned = task.assignee_id === userId;
-                          const isCurrentUser = userId === user?.id;
-
-                          return (
-                            <Tag
-                              key={userId}
-                              color={
-                                isAssigned
-                                  ? "green"
-                                  : isCurrentUser
-                                  ? "blue"
-                                  : "default"
-                              }
-                              icon={
-                                isAssigned ? (
-                                  <CheckCircleOutlined />
-                                ) : (
-                                  <UserOutlined />
-                                )
-                              }
-                            >
-                              <Avatar
-                                size="small"
-                                src={userInfo.avatar}
-                                style={{ marginRight: 4 }}
-                              />
-                              {userInfo.fullName}
-                              {isAssigned && " (Phụ trách)"}
-                              {isCurrentUser && !isAssigned && " (Bạn)"}
-                            </Tag>
-                          );
-                        })}
-                      </Space>
-                    ) : (
-                      <Text type="secondary">Chưa có thành viên nào</Text>
-                    )}
-                  </div>
-                </div>
-
-                {/* Button từ chối chỉ hiển thị nếu user có quyền */}
-                {canRefuseTask() && (
-                  <div
-                    style={{
-                      marginTop: 16,
-                      paddingTop: 12,
-                      borderTop: "1px solid #ffccc7",
-                      textAlign: "center",
-                    }}
-                  >
-                    <Text
-                      type="secondary"
-                      style={{ display: "block", marginBottom: 8 }}
-                    >
-                      Bạn được mời tham gia công việc đột xuất này
-                    </Text>
-
-                    <Popconfirm
-                      title="Từ chối tham gia"
-                      description={
-                        <div>
-                          <p>
-                            Bạn có chắc chắn muốn từ chối tham gia công việc
-                            này?
-                          </p>
-                          <p style={{ fontSize: "12px", color: "#666" }}>
-                            Manager sẽ nhận được thông báo và có thể chọn người
-                            khác.
-                          </p>
-                        </div>
-                      }
-                      onConfirm={handleRefuseTask}
-                      okText="Từ chối"
-                      cancelText="Hủy"
-                      okType="danger"
-                      disabled={refusing}
-                    >
-                      <Button
-                        icon={<CloseCircleOutlined />}
-                        danger
-                        loading={refusing}
-                        size="middle"
-                      >
-                        Từ chối tham gia
-                      </Button>
-                    </Popconfirm>
-                  </div>
-                )}
-              </Card>
-            )}
             {/* Team Members */}
             {task.listUser && task.listUser.length > 0 && (
-              <Card title="Thành viên tham gia" style={{ marginBottom: 16 }}>
+              <Card className="task-members-card" style={{ marginBottom: 16 }}>
+                <div className="card-header">
+                  <Title level={isMobile ? 5 : 4} style={{ margin: 0 }}>
+                    {isMobile ? "Thành viên" : "Thành viên tham gia"}
+                  </Title>
+                </div>
                 <List
+                  className="task-members-list"
                   dataSource={task.listUser}
+                  size={isMobile ? "small" : "default"}
                   renderItem={(userId) => {
                     const userItem = getUserInfo(userId);
                     if (!userItem) return null;
 
                     return (
-                      <List.Item>
+                      <List.Item className="task-member-item">
                         <List.Item.Meta
                           avatar={
                             <Avatar
+                              size={isMobile ? "small" : "default"}
                               src={userItem.avatar}
                               icon={<UserOutlined />}
                             />
                           }
                           title={
-                            <Space>
-                              <span>{userItem.fullName}</span>
-                              {userItem._id === task.createdBy && (
-                                <Tag color="gold" size="small">
-                                  Tạo
-                                </Tag>
-                              )}
-                              {userItem._id === task.assignee_id && (
-                                <Tag color="blue" size="small">
-                                  Thực hiện
-                                </Tag>
-                              )}
-                              {userItem._id === user?.id && (
-                                <Tag color="green" size="small">
-                                  Bạn
-                                </Tag>
-                              )}
-                            </Space>
+                            <div className="member-title">
+                              <span className="member-name">{userItem.fullName}</span>
+                              <div className="member-tags">
+                                {userItem._id === task.createdBy && (
+                                  <Tag color="gold" size="small">
+                                    {isMobile ? "Tạo" : "Tạo"}
+                                  </Tag>
+                                )}
+                                {userItem._id === task.assignee_id && (
+                                  <Tag color="blue" size="small">
+                                    {isMobile ? "TH" : "Thực hiện"}
+                                  </Tag>
+                                )}
+                                {userItem._id === user?.id && (
+                                  <Tag color="green" size="small">
+                                    Bạn
+                                  </Tag>
+                                )}
+                              </div>
+                            </div>
                           }
-                          description={userItem.email}
+                          description={
+                            <div className="member-email">
+                              {!isMobile && userItem.email}
+                            </div>
+                          }
                         />
                       </List.Item>
                     );
@@ -1027,20 +1140,27 @@ const SubProjectDetail = () => {
             )}
 
             {/* Quick Stats */}
-            <Card title="Thống kê">
+            <Card className="task-stats-card">
+              <div className="card-header">
+                <Title level={isMobile ? 5 : 4} style={{ margin: 0 }}>
+                  {isMobile ? "Thống kê" : "Thống kê"}
+                </Title>
+              </div>
               <Row gutter={[16, 16]}>
                 <Col span={12}>
                   <Statistic
-                    title="Bình luận"
+                    title={isMobile ? "Bình luận" : "Bình luận"}
                     value={comments.length}
                     prefix={<CommentOutlined />}
+                    valueStyle={{ fontSize: isMobile ? 18 : 22 }}
                   />
                 </Col>
                 <Col span={12}>
                   <Statistic
-                    title="Thành viên"
+                    title={isMobile ? "Thành viên" : "Thành viên"}
                     value={task.listUser?.length || 0}
                     prefix={<TeamOutlined />}
+                    valueStyle={{ fontSize: isMobile ? 18 : 22 }}
                   />
                 </Col>
               </Row>
@@ -1048,36 +1168,50 @@ const SubProjectDetail = () => {
           </Col>
 
           {/* Right Column - Tabs */}
-          <Col xs={24} lg={16}>
-            <Card>
-              <Tabs defaultActiveKey="comments">
-                <TabPane tab={`Thảo luận (${comments.length})`} key="comments">
+          <Col xs={24} md={16} lg={16} xl={17} className="task-content-main">
+            <Card className="task-content-card">
+              <Tabs 
+                defaultActiveKey="comments" 
+                size={isMobile ? "small" : "default"}
+                className="task-tabs"
+              >
+                <TabPane 
+                  tab={
+                    <span>
+                      <CommentOutlined /> {isMobile ? `BL (${comments.length})` : `Thảo luận (${comments.length})`}
+                    </span>
+                  } 
+                  key="comments"
+                >
                   {/* Kiểm tra quyền comment trước khi hiển thị input */}
                   {canComment() ? (
-                    <div style={{ marginBottom: 24 }}>
-                      <div style={{ display: "flex", gap: 8 }}>
+                    <div className="comment-input-section" style={{ marginBottom: 24 }}>
+                      <div className="comment-input-wrapper">
                         <Avatar
-                          size="large"
+                          size={isMobile ? "default" : "large"}
                           src={user?.avatar}
                           icon={<UserOutlined />}
                           style={{ backgroundColor: "#1890ff" }}
+                          className="comment-avatar"
                         />
-                        <div style={{ flex: 1 }}>
+                        <div className="comment-input-content">
                           <TextArea
-                            rows={3}
+                            rows={isMobile ? 2 : 3}
                             placeholder="Thêm bình luận về công việc này..."
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
                             maxLength={500}
                             showCount
+                            className="comment-textarea"
                           />
-                          <div style={{ marginTop: 8, textAlign: "right" }}>
+                          <div className="comment-actions">
                             <Button
                               type="primary"
                               icon={<SendOutlined />}
                               onClick={handleAddComment}
                               loading={submitting}
                               disabled={!commentText.trim()}
+                              size={isMobile ? "small" : "middle"}
                             >
                               Gửi
                             </Button>
@@ -1087,9 +1221,10 @@ const SubProjectDetail = () => {
                     </div>
                   ) : (
                     <Card
+                      className="comment-permission-card"
                       style={{ marginBottom: 16, backgroundColor: "#fff2e8" }}
                     >
-                      <div style={{ textAlign: "center", padding: "16px" }}>
+                      <div className="permission-message">
                         <LockOutlined
                           style={{
                             fontSize: 24,
@@ -1100,7 +1235,7 @@ const SubProjectDetail = () => {
                         <div>
                           Bạn không có quyền comment trong công việc này
                         </div>
-                        <Text type="secondary" style={{ fontSize: "12px" }}>
+                        <Text type="secondary" style={{ fontSize: isMobile ? "11px" : "12px" }}>
                           Chỉ người tạo, người thực hiện và thành viên của công
                           việc mới được comment
                         </Text>
@@ -1110,19 +1245,19 @@ const SubProjectDetail = () => {
 
                   {/* Comments list */}
                   {comments.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "40px 0" }}>
+                    <div className="empty-comments">
                       <CommentOutlined
                         style={{
-                          fontSize: 48,
+                          fontSize: isMobile ? 36 : 48,
                           color: "#d9d9d9",
                           marginBottom: 16,
                         }}
                       />
-                      <div>Chưa có bình luận nào</div>
+                      <div style={{ fontSize: isMobile ? 14 : 16 }}>Chưa có bình luận nào</div>
                       {!canComment() && (
                         <Text
                           type="secondary"
-                          style={{ fontSize: "12px", marginTop: 8 }}
+                          style={{ fontSize: isMobile ? "11px" : "12px", marginTop: 8 }}
                         >
                           Tham gia công việc để bình luận
                         </Text>
@@ -1130,52 +1265,104 @@ const SubProjectDetail = () => {
                     </div>
                   ) : (
                     <List
+                      className="comments-list"
                       dataSource={comments.sort(
                         (a, b) => (b.position || 0) - (a.position || 0)
                       )}
+                      size={isMobile ? "small" : "default"}
                       renderItem={(comment) => {
                         const commentUser = getUserFromComment(comment);
                         const isOwner = checkCommentOwnership(comment); // Sửa ở đây
 
                         return (
                           <List.Item
-                            actions={[
-                              isOwner && (
-                                <Button
-                                  size="small"
-                                  type="text"
-                                  icon={<EditOutlined />}
-                                  onClick={() => handleEditComment(comment)}
-                                >
-                                  Sửa
-                                </Button>
-                              ),
-
-                              isOwner && (
-                                <Popconfirm
-                                  title="Xóa comment"
-                                  description="Bạn có chắc chắn muốn xóa comment này?"
-                                  onConfirm={() => handleDeleteComment(comment)}
-                                  okText="Xóa"
-                                  cancelText="Hủy"
-                                  okType="danger"
-                                >
-                                  <Button
-                                    size="small"
-                                    type="text"
-                                    danger
-                                    icon={<DeleteOutlined />}
-                                  >
-                                    Xóa
-                                  </Button>
-                                </Popconfirm>
-                              ),
-                            ].filter(Boolean)}
+                            key={comment._id}
+                            className="comment-item"
+                            actions={
+                              isMobile
+                                ? [
+                                    isOwner && (
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        icon={<MoreOutlined />}
+                                        onClick={() => {
+                                          modal.confirm({
+                                            title: 'Tùy chọn comment',
+                                            content: (
+                                              <div>
+                                                <Button 
+                                                  type="text" 
+                                                  block 
+                                                  icon={<EditOutlined />}
+                                                  onClick={() => {
+                                                    modal.destroy();
+                                                    handleEditComment(comment);
+                                                  }}
+                                                >
+                                                  Chỉnh sửa
+                                                </Button>
+                                                <Divider style={{ margin: '8px 0' }} />
+                                                <Button 
+                                                  type="text" 
+                                                  danger 
+                                                  block 
+                                                  icon={<DeleteOutlined />}
+                                                  onClick={() => {
+                                                    modal.destroy();
+                                                    handleDeleteComment(comment);
+                                                  }}
+                                                >
+                                                  Xóa
+                                                </Button>
+                                              </div>
+                                            ),
+                                            footer: null,
+                                            width: 200
+                                          });
+                                        }}
+                                      >
+                                        {isMobile ? "..." : "Tùy chọn"}
+                                      </Button>
+                                    )
+                                  ].filter(Boolean)
+                                : [
+                                    isOwner && (
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        icon={<EditOutlined />}
+                                        onClick={() => handleEditComment(comment)}
+                                      >
+                                        Sửa
+                                      </Button>
+                                    ),
+                                    isOwner && (
+                                      <Popconfirm
+                                        title="Xóa comment"
+                                        description="Bạn có chắc chắn muốn xóa comment này?"
+                                        onConfirm={() => handleDeleteComment(comment)}
+                                        okText="Xóa"
+                                        cancelText="Hủy"
+                                        okType="danger"
+                                      >
+                                        <Button
+                                          size="small"
+                                          type="text"
+                                          danger
+                                          icon={<DeleteOutlined />}
+                                        >
+                                          Xóa
+                                        </Button>
+                                      </Popconfirm>
+                                    ),
+                                  ].filter(Boolean)
+                            }
                           >
                             <List.Item.Meta
                               avatar={
                                 <Avatar
-                                  size="large"
+                                  size={isMobile ? "default" : "large"}
                                   src={commentUser?.avatar}
                                   style={{
                                     backgroundColor: isOwner
@@ -1190,39 +1377,42 @@ const SubProjectDetail = () => {
                                 </Avatar>
                               }
                               title={
-                                <Space>
-                                  <strong>
-                                    {commentUser?.fullName || comment.userName}
-                                  </strong>
-                                  {isOwner && (
-                                    <Tag color="blue" size="small">
-                                      Bạn
-                                    </Tag>
-                                  )}
-                                  {commentUser &&
-                                    commentUser._id === task.createdBy && (
-                                      <Tag
-                                        color="gold"
-                                        size="small"
-                                        icon={<CrownOutlined />}
-                                      >
-                                        Người tạo
+                                <div className="comment-header">
+                                  <Space wrap size={4}>
+                                    <strong className="comment-author">
+                                      {commentUser?.fullName || comment.userName}
+                                    </strong>
+                                    {isOwner && (
+                                      <Tag color="blue" size="small">
+                                        Bạn
                                       </Tag>
                                     )}
-                                  <span style={{ color: "#999", fontSize: 12 }}>
-                                    {moment(
-                                      comment.createdAt || comment.created_at
-                                    ).fromNow()}
-                                  </span>
-                                </Space>
+                                    {commentUser &&
+                                      commentUser._id === task.createdBy && (
+                                        <Tag
+                                          color="gold"
+                                          size="small"
+                                          icon={<CrownOutlined />}
+                                        >
+                                          {isMobile ? "Tạo" : "Người tạo"}
+                                        </Tag>
+                                      )}
+                                    <span className="comment-time" style={{ color: "#999", fontSize: isMobile ? 10 : 12 }}>
+                                      {moment(
+                                        comment.createdAt || comment.created_at
+                                      ).fromNow()}
+                                    </span>
+                                  </Space>
+                                </div>
                               }
                               description={
-                                <div>
+                                <div className="comment-body">
                                   <p
                                     style={{
                                       margin: 0,
                                       whiteSpace: "pre-wrap",
                                     }}
+                                    className="comment-content"
                                   >
                                     {comment.content || comment.comment}
                                   </p>
@@ -1230,11 +1420,7 @@ const SubProjectDetail = () => {
                                     comment.updatedAt !== comment.createdAt && (
                                       <Text
                                         type="secondary"
-                                        style={{
-                                          fontSize: "11px",
-                                          marginTop: 4,
-                                          display: "block",
-                                        }}
+                                        className="comment-edited"
                                       >
                                         <EditOutlined /> Đã chỉnh sửa{" "}
                                         {moment(comment.updatedAt).fromNow()}
@@ -1250,24 +1436,31 @@ const SubProjectDetail = () => {
                   )}
                 </TabPane>
 
-                <TabPane tab="Lịch sử" key="history" icon={<HistoryOutlined />}>
-                  <Timeline>
+                <TabPane 
+                  tab={
+                    <span>
+                      <HistoryOutlined /> {isMobile ? "Lịch sử" : "Lịch sử"}
+                    </span>
+                  } 
+                  key="history"
+                >
+                  <Timeline className="task-history-timeline">
                     <Timeline.Item color="green">
-                      <p>
+                      <p className="timeline-event-title">
                         <strong>Công việc được tạo</strong>
                       </p>
-                      <p>Bởi: {taskCreator?.fullName || "Người dùng"}</p>
-                      <small>
-                        {moment(task.createdAt).format("DD/MM/YYYY HH:mm")}
+                      <p className="timeline-event-detail">Bởi: {taskCreator?.fullName || "Người dùng"}</p>
+                      <small className="timeline-event-time">
+                        {moment(task.createdAt).format(isMobile ? "DD/MM HH:mm" : "DD/MM/YYYY HH:mm")}
                       </small>
                     </Timeline.Item>
 
                     {task.timeStart && (
                       <Timeline.Item color="blue">
-                        <p>
+                        <p className="timeline-event-title">
                           <strong>
                             Ngày bắt đầu:{" "}
-                            {moment(task.timeStart).format("DD/MM/YYYY")}
+                            {moment(task.timeStart).format(isMobile ? "DD/MM" : "DD/MM/YYYY")}
                           </strong>
                         </p>
                       </Timeline.Item>
@@ -1275,45 +1468,149 @@ const SubProjectDetail = () => {
 
                     {task.timeFinish && (
                       <Timeline.Item color="orange">
-                        <p>
+                        <p className="timeline-event-title">
                           <strong>
                             Hạn hoàn thành:{" "}
-                            {moment(task.timeFinish).format("DD/MM/YYYY")}
+                            {moment(task.timeFinish).format(isMobile ? "DD/MM" : "DD/MM/YYYY")}
                           </strong>
                         </p>
                       </Timeline.Item>
                     )}
 
                     {/* Có thể thêm các sự kiện thay đổi status ở đây */}
+                    {task.status !== "not-started" && (
+                      <Timeline.Item color={getStatusColor(task.status)}>
+                        <p className="timeline-event-title">
+                          <strong>Trạng thái thay đổi: {getStatusText(task.status)}</strong>
+                        </p>
+                        {task.updatedAt && (
+                          <small className="timeline-event-time">
+                            {moment(task.updatedAt).format(isMobile ? "DD/MM HH:mm" : "DD/MM/YYYY HH:mm")}
+                          </small>
+                        )}
+                      </Timeline.Item>
+                    )}
                   </Timeline>
 
                   <Divider />
 
-                  <div style={{ textAlign: "center", padding: "20px 0" }}>
-                    <Text type="secondary">
+                  <div className="history-note" style={{ textAlign: "center", padding: "20px 0" }}>
+                    <Text type="secondary" style={{ fontSize: isMobile ? 12 : 14 }}>
                       Lịch sử thay đổi chi tiết sẽ được cập nhật khi có hoạt
                       động
                     </Text>
                   </div>
                 </TabPane>
 
-                <TabPane tab="Tệp đính kèm" key="attachments">
-                  <div style={{ textAlign: "center", padding: "40px 0" }}>
-                    <FileTextOutlined
-                      style={{
-                        fontSize: 48,
-                        color: "#d9d9d9",
-                        marginBottom: 16,
-                      }}
+                <TabPane 
+                  tab={
+                    <span>
+                      <PaperClipOutlined /> {isMobile ? `Tệp (${attachments.length})` : `Tệp đính kèm (${attachments.length})`}
+                    </span>
+                  } 
+                  key="attachments"
+                >
+                  {attachments.length === 0 ? (
+                    <div className="empty-attachments">
+                      <FileOutlined
+                        style={{
+                          fontSize: isMobile ? 36 : 48,
+                          color: "#d9d9d9",
+                          marginBottom: 16,
+                        }}
+                      />
+                      <div style={{ fontSize: isMobile ? 14 : 16 }}>Chưa có tệp đính kèm</div>
+                      <Text
+                        type="secondary"
+                        style={{ fontSize: isMobile ? "11px" : "12px", marginTop: 8 }}
+                      >
+                        {canEditTask() ? "Bạn có thể tải lên tệp đính kèm" : "Chỉ người có quyền mới có thể thêm tệp"}
+                      </Text>
+                      
+                      {canEditTask() && (
+                        <div style={{ marginTop: 20 }}>
+                          <Alert
+                            message="Tính năng upload file"
+                            description="Tính năng upload file đang được phát triển và sẽ sớm có mặt"
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 16 }}
+                          />
+                          {/* <Upload
+                            beforeUpload={handleUploadAttachment}
+                            showUploadList={false}
+                          >
+                            <Button 
+                              icon={<UploadOutlined />} 
+                              type="primary"
+                              loading={uploading}
+                              size={isMobile ? "middle" : "large"}
+                            >
+                              Tải lên tệp
+                            </Button>
+                          </Upload> */}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <List
+                      className="attachments-list"
+                      dataSource={attachments}
+                      size={isMobile ? "small" : "default"}
+                      renderItem={(attachment) => (
+                        <List.Item
+                          className="attachment-item"
+                          actions={[
+                            <Button
+                              key="download"
+                              size="small"
+                              icon={<DownloadOutlined />}
+                              onClick={() => window.open(attachment.url, '_blank')}
+                            >
+                              {isMobile ? "Tải" : "Tải xuống"}
+                            </Button>,
+                            canEditTask() && (
+                              <Button
+                                key="delete"
+                                size="small"
+                                danger
+                                icon={<DeleteOutlined />}
+                              >
+                                {isMobile ? "Xóa" : "Xóa"}
+                              </Button>
+                            ),
+                          ].filter(Boolean)}
+                        >
+                          <List.Item.Meta
+                            avatar={
+                              <Avatar
+                                icon={<FileOutlined />}
+                                style={{ backgroundColor: '#1890ff' }}
+                              />
+                            }
+                            title={
+                              <div className="attachment-title">
+                                <Text strong>{attachment.name}</Text>
+                                <Tag size="small" color="blue">
+                                  {attachment.size}
+                                </Tag>
+                              </div>
+                            }
+                            description={
+                              <div className="attachment-meta">
+                                <Text type="secondary" style={{ fontSize: isMobile ? 11 : 12 }}>
+                                  Tải lên bởi: {getUserInfo(attachment.uploadedBy)?.fullName || "Người dùng"}
+                                </Text>
+                                <Text type="secondary" style={{ fontSize: isMobile ? 11 : 12, marginLeft: 8 }}>
+                                  • {moment(attachment.uploadedAt).fromNow()}
+                                </Text>
+                              </div>
+                            }
+                          />
+                        </List.Item>
+                      )}
                     />
-                    <div>Chưa có tệp đính kèm</div>
-                    <Text
-                      type="secondary"
-                      style={{ fontSize: "12px", marginTop: 8 }}
-                    >
-                      Tính năng upload file đang phát triển
-                    </Text>
-                  </div>
+                  )}
                 </TabPane>
               </Tabs>
             </Card>
@@ -1350,6 +1647,8 @@ const SubProjectDetail = () => {
               Lưu thay đổi
             </Button>,
           ]}
+          width={isMobile ? '95%' : 500}
+          centered
         >
           <TextArea
             rows={4}
@@ -1372,8 +1671,9 @@ const SubProjectDetail = () => {
               setEditingTask(null);
             }}
             footer={null}
-            width={700}
+            width={modalWidth}
             destroyOnClose
+            centered
           >
             <ProjectForm
               visible={editModalVisible}
@@ -1392,6 +1692,7 @@ const SubProjectDetail = () => {
               parentProjectId={
                 parentProject?._id || editingTask?.projectParentId
               }
+              isMobile={isMobile}
             />
           </Modal>
         )}

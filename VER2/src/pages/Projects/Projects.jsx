@@ -15,7 +15,10 @@ import {
   Statistic,
   Table,
   Tag,
-  App
+  App,
+  Dropdown,
+  Menu,
+  Tooltip
 } from 'antd';
 import {
   PlusOutlined,
@@ -28,7 +31,10 @@ import {
   ClockCircleOutlined,
   EyeOutlined,
   EditOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  FilterOutlined,
+  MoreOutlined,
+  SettingOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import ProjectCard from '../../components/Projects/ProjectCard';
@@ -37,13 +43,15 @@ import { useAuth } from '../../contexts/AuthContext';
 import userService from '../../services/userService';
 import projectService from '../../services/projectService';
 import debounce from 'lodash/debounce';
-import axios from 'axios';
-const { Title } = Typography;
+import { useResponsive, getModalWidth, getDisplayCount } from '../../utils/responsiveUtils';
+
+const { Title, Text } = Typography;
 const { Option } = Select;
 const { TabPane } = Tabs;
 
 const ProjectsContent = () => {
   const { modal } = App.useApp();
+  const { isMobile, isTablet, isDesktop } = useResponsive();
   const [projects, setProjects] = useState([]);
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -63,11 +71,15 @@ const ProjectsContent = () => {
   
   const [sortField, setSortField] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [showFilters, setShowFilters] = useState(false);
   
   const { user: currentUser, isManager, getUserId } = useAuth();
   
   const [users, setUsers] = useState([]);
   
+  const modalWidth = getModalWidth(isMobile, isTablet, isDesktop);
+  const displayCount = getDisplayCount(isMobile, isTablet, 10);
+
   useEffect(() => {
     if (currentUser) {
       console.log('🔍 Current User in Projects:', {
@@ -97,35 +109,34 @@ const ProjectsContent = () => {
   }, [projects, searchText, filterStatus, filterPriority, activeTab]);
 
   // Projects.jsx - sửa hàm loadUsers
-const loadUsers = async () => {
-  try {
-    console.log('=== DEBUG Projects.jsx loadUsers ===');
-    
-    const response = await userService.getUsers();
-    
-    console.log('User service response:', response);
-    console.log('Response success:', response.success);
-    console.log('Response data (users array):', response.data);
-    console.log('Response data length:', response.data?.length);
-    
-    if (response.success && Array.isArray(response.data)) {
-      setUsers(response.data);
-      console.log('✅ Users set to state:', response.data.length, 'users');
+  const loadUsers = async () => {
+    try {
+      console.log('=== DEBUG Projects.jsx loadUsers ===');
       
-      // Log first user để xem cấu trúc
-      if (response.data.length > 0) {
-        console.log('First user structure:', response.data[0]);
-        console.log('Keys of first user:', Object.keys(response.data[0]));
+      const response = await userService.getUsers();
+      
+      console.log('User service response:', response);
+      console.log('Response success:', response.success);
+      console.log('Response data (users array):', response.data);
+      console.log('Response data length:', response.data?.length);
+      
+      if (response.success && Array.isArray(response.data)) {
+        setUsers(response.data);
+        console.log('✅ Users set to state:', response.data.length, 'users');
+        
+        if (response.data.length > 0) {
+          console.log('First user structure:', response.data[0]);
+          console.log('Keys of first user:', Object.keys(response.data[0]));
+        }
+      } else {
+        console.error('❌ Invalid users response:', response);
+        setUsers([]);
       }
-    } else {
-      console.error('❌ Invalid users response:', response);
+    } catch (error) {
+      console.error('❌ Error loading users:', error);
       setUsers([]);
     }
-  } catch (error) {
-    console.error('❌ Error loading users:', error);
-    setUsers([]);
-  }
-};
+  };
 
   const loadProjects = async () => {
     setLoading(true);
@@ -227,9 +238,6 @@ const loadUsers = async () => {
           console.log(`  ${key}:`, value);
         }
         
-        // Thêm createdBy vào formData
-        // formData.append('createdBy', currentUserId);
-        
         // Gọi service update
         response = await projectService.updateProject(editingProject._id, formData);
         
@@ -286,7 +294,7 @@ const loadUsers = async () => {
     }
   };
 
-const handleDeleteProject = async (projectId) => {
+  const handleDeleteProject = async (projectId) => {
     console.log('=== HANDLE DELETE PROJECT CALLED ===');
     
     // Sử dụng modal từ useApp hook
@@ -401,6 +409,11 @@ const handleDeleteProject = async (projectId) => {
       dataIndex: 'title',
       key: 'title',
       sorter: true,
+      render: (text) => (
+        <span style={{ fontSize: isMobile ? 13 : 14 }}>
+          {isMobile && text.length > 25 ? text.substring(0, 25) + '...' : text}
+        </span>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -415,7 +428,7 @@ const handleDeleteProject = async (projectId) => {
           'cancelled': { text: 'Đã hủy', color: 'error' },
         };
         const statusInfo = statusMap[status] || { text: status, color: 'default' };
-        return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
+        return <Tag color={statusInfo.color} size={isMobile ? "small" : "default"}>{statusInfo.text}</Tag>;
       },
     },
     {
@@ -429,20 +442,36 @@ const handleDeleteProject = async (projectId) => {
           'high': { text: 'Cao', color: 'red' },
         };
         const priorityInfo = priorityMap[priority] || { text: priority, color: 'default' };
-        return <Tag color={priorityInfo.color}>{priorityInfo.text}</Tag>;
+        return <Tag color={priorityInfo.color} size={isMobile ? "small" : "default"}>{priorityInfo.text}</Tag>;
       },
     },
     {
       title: 'Ngày bắt đầu',
       dataIndex: 'timeStart',
       key: 'timeStart',
-      render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : '-',
+      render: (date) => (
+        <span style={{ fontSize: isMobile ? 12 : 13 }}>
+          {date ? new Date(date).toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: isMobile ? '2-digit' : 'numeric'
+          }) : '-'}
+        </span>
+      ),
     },
     {
       title: 'Hạn hoàn thành',
       dataIndex: 'timeFinish',
       key: 'timeFinish',
-      render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : '-',
+      render: (date) => (
+        <span style={{ fontSize: isMobile ? 12 : 13 }}>
+          {date ? new Date(date).toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: isMobile ? '2-digit' : 'numeric'
+          }) : '-'}
+        </span>
+      ),
     },
     {
       title: 'Vai trò',
@@ -460,36 +489,80 @@ const handleDeleteProject = async (projectId) => {
           roleColor = 'green';
         }
         
-        return roleText ? <Tag color={roleColor}>{roleText}</Tag> : '-';
+        return roleText ? (
+          <Tag color={roleColor} size={isMobile ? "small" : "default"}>
+            {isMobile ? roleText.substring(0, 3) : roleText}
+          </Tag>
+        ) : '-';
       },
     },
     {
       title: 'Thao tác',
       key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewProject(record)}
-          />
-          {canEditProject(record) && (
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEditProject(record)}
-            />
-          )}
-          {canDeleteProject(record) && (
-            <Button
-              size="small"
-              icon={<DeleteOutlined />}
-              danger
-              onClick={() => handleDeleteProject(record._id)}
-            />
-          )}
-        </Space>
-      ),
+      render: (_, record) => {
+        const actions = [
+          {
+            key: 'view',
+            label: 'Xem chi tiết',
+            icon: <EyeOutlined />,
+            onClick: () => handleViewProject(record)
+          }
+        ];
+        
+        if (canEditProject(record)) {
+          actions.push({
+            key: 'edit',
+            label: 'Chỉnh sửa',
+            icon: <EditOutlined />,
+            onClick: () => handleEditProject(record)
+          });
+        }
+        
+        if (canDeleteProject(record)) {
+          actions.push({
+            key: 'delete',
+            label: 'Xóa',
+            icon: <DeleteOutlined />,
+            danger: true,
+            onClick: () => handleDeleteProject(record._id)
+          });
+        }
+        
+        if (isMobile) {
+          return (
+            <Dropdown
+              menu={{
+                items: actions.map(action => ({
+                  key: action.key,
+                  label: action.label,
+                  icon: action.icon,
+                  danger: action.danger,
+                  onClick: action.onClick
+                }))
+              }}
+              placement="bottomRight"
+            >
+              <Button size="small" icon={<MoreOutlined />} />
+            </Dropdown>
+          );
+        }
+        
+        return (
+          <Space size={isMobile ? 2 : 4}>
+            {actions.map(action => (
+              <Button
+                key={action.key}
+                size="small"
+                icon={action.icon}
+                onClick={action.onClick}
+                danger={action.danger}
+              >
+                {!isMobile && action.label}
+              </Button>
+            ))}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -502,19 +575,55 @@ const handleDeleteProject = async (projectId) => {
     assignedToMe: projects.filter(p => p.createdBy === currentUserId).length,
   };
 
+  // Mobile filter menu
+  const filterMenu = (
+    <Menu>
+      <Menu.ItemGroup title="Trạng thái">
+        <Menu.Item key="all-status" onClick={() => setFilterStatus('all')}>
+          Tất cả trạng thái
+        </Menu.Item>
+        <Menu.Item key="not-started" onClick={() => setFilterStatus('not-started')}>
+          Chưa bắt đầu
+        </Menu.Item>
+        <Menu.Item key="in-progress" onClick={() => setFilterStatus('in-progress')}>
+          Đang thực hiện
+        </Menu.Item>
+        <Menu.Item key="completed" onClick={() => setFilterStatus('completed')}>
+          Hoàn thành
+        </Menu.Item>
+      </Menu.ItemGroup>
+      <Menu.Divider />
+      <Menu.ItemGroup title="Độ ưu tiên">
+        <Menu.Item key="all-priority" onClick={() => setFilterPriority('all')}>
+          Tất cả ưu tiên
+        </Menu.Item>
+        <Menu.Item key="high" onClick={() => setFilterPriority('high')}>
+          Cao
+        </Menu.Item>
+        <Menu.Item key="medium" onClick={() => setFilterPriority('medium')}>
+          Trung bình
+        </Menu.Item>
+        <Menu.Item key="low" onClick={() => setFilterPriority('low')}>
+          Thấp
+        </Menu.Item>
+      </Menu.ItemGroup>
+    </Menu>
+  );
+
   return (
-    <div>
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <Title level={2} style={{ margin: 0 }}>
+    <div className="projects-page">
+      {/* Header */}
+      <Card className="projects-header-card">
+        <div className="projects-header-content">
+          <div className="projects-header-info">
+            <Title level={isMobile ? 3 : 2} style={{ margin: 0 }} className="projects-title">
               <ProjectOutlined style={{ marginRight: 12, color: '#1890ff' }} />
-              {isManager() ? 'Quản Lý Dự Án' : 'Dự Án Của Tôi'}
+              {isManager() ? (isMobile ? 'QL Dự Án' : 'Quản Lý Dự Án') : (isMobile ? 'Dự Án Của Tôi' : 'Dự Án Của Tôi')}
             </Title>
-            <p style={{ margin: 0, color: '#666' }}>
+            <p style={{ margin: 0, color: '#666', fontSize: isMobile ? 13 : 14 }} className="projects-subtitle">
               {isManager() 
-                ? 'Quản lý và theo dõi tiến độ tất cả dự án' 
-                : 'Các dự án bạn đang tham gia và phụ trách'}
+                ? (isMobile ? 'Quản lý dự án' : 'Quản lý và theo dõi tiến độ tất cả dự án') 
+                : (isMobile ? 'Dự án bạn tham gia' : 'Các dự án bạn đang tham gia và phụ trách')}
             </p>
           </div>
 
@@ -523,151 +632,216 @@ const handleDeleteProject = async (projectId) => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => setModalVisible(true)}
+              size={isMobile ? "middle" : "large"}
+              className="create-project-btn"
             >
-              Tạo Dự Án
+              {isMobile ? 'Tạo' : 'Tạo Dự Án'}
             </Button>
           )}
         </div>
       </Card>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={6}>
-          <Card>
+      {/* Statistics Cards - ĐÃ FIX RESPONSIVE */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }} className="stats-row">
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title="Tổng số dự án"
+              title={isMobile ? "Tổng" : "Tổng số dự án"}
               value={stats.total}
               prefix={<ProjectOutlined />}
+              valueStyle={{ fontSize: isMobile ? 20 : 24 }}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card>
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title="Đang thực hiện"
+              title={isMobile ? "Đang làm" : "Đang thực hiện"}
               value={stats.inProgress}
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: '#1890ff', fontSize: isMobile ? 20 : 24 }}
               prefix={<ClockCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card>
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title="Hoàn thành"
+              title={isMobile ? "Hoàn thành" : "Hoàn thành"}
               value={stats.completed}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#52c41a', fontSize: isMobile ? 20 : 24 }}
               prefix={<CheckCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card>
+        <Col xs={12} sm={6} md={6} lg={6}>
+          <Card className="stat-card">
             <Statistic
-              title={isManager() ? "Bạn phụ trách" : "Bạn phụ trách"}
+              title={isMobile ? "Bạn PT" : "Bạn phụ trách"}
               value={stats.assignedToMe}
-              valueStyle={{ color: '#722ed1' }}
+              valueStyle={{ color: '#722ed1', fontSize: isMobile ? 20 : 24 }}
               prefix={<UserOutlined />}
             />
           </Card>
         </Col>
       </Row>
 
-      <Card style={{ marginBottom: 16 }}>
+      <Card className="projects-content-card">
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
-          items={[
-            {
-              key: 'all',
-              label: `Tất cả (${stats.total})`
-            },
-            {
-              key: 'in-progress',
-              label: `Đang thực hiện (${stats.inProgress})`
-            },
-            {
-              key: 'not-started',
-              label: `Chưa bắt đầu (${stats.notStarted})`
-            },
-            {
-              key: 'completed',
-              label: `Hoàn thành (${stats.completed})`
-            },
-            {
-              key: 'on-hold',
-              label: `Tạm dừng (${projects.filter(p => p.status === 'on-hold').length})`
-            }
-          ]}
-        />
+          size={isMobile ? "small" : "default"}
+          className="projects-tabs"
+        >
+          <TabPane
+            key="all"
+            tab={isMobile ? `Tất cả (${stats.total})` : `Tất cả (${stats.total})`}
+          />
+          <TabPane
+            key="in-progress"
+            tab={isMobile ? `Đang làm (${stats.inProgress})` : `Đang thực hiện (${stats.inProgress})`}
+          />
+          <TabPane
+            key="not-started"
+            tab={isMobile ? `Chưa bắt đầu (${stats.notStarted})` : `Chưa bắt đầu (${stats.notStarted})`}
+          />
+          <TabPane
+            key="completed"
+            tab={isMobile ? `Hoàn thành (${stats.completed})` : `Hoàn thành (${stats.completed})`}
+          />
+          <TabPane
+            key="on-hold"
+            tab={isMobile ? `Tạm dừng (${projects.filter(p => p.status === 'on-hold').length})` : `Tạm dừng (${projects.filter(p => p.status === 'on-hold').length})`}
+          />
+        </Tabs>
 
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }} align="middle">
-          <Col xs={24} md={8}>
+        {/* Filter Controls - ĐÃ FIX RESPONSIVE */}
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }} align="middle" className="filter-row">
+          <Col xs={24} sm={isMobile ? 24 : 8} md={8} lg={8}>
             <Input
               placeholder="Tìm kiếm dự án..."
               prefix={<SearchOutlined />}
               onChange={(e) => debouncedSearch(e.target.value)}
               allowClear
+              size={isMobile ? "middle" : "large"}
+              className="search-input"
             />
           </Col>
-          <Col xs={12} md={4}>
-            <Select
-              value={filterStatus}
-              onChange={setFilterStatus}
-              style={{ width: '100%' }}
-              placeholder="Trạng thái"
-              allowClear
-            >
-              <Option value="all">Tất cả trạng thái</Option>
-              <Option value="not-started">Chưa bắt đầu</Option>
-              <Option value="in-progress">Đang thực hiện</Option>
-              <Option value="on-hold">Tạm dừng</Option>
-              <Option value="completed">Hoàn thành</Option>
-              <Option value="cancelled">Đã hủy</Option>
-            </Select>
-          </Col>
-          <Col xs={12} md={4}>
-            <Select
-              value={filterPriority}
-              onChange={setFilterPriority}
-              style={{ width: '100%' }}
-              placeholder="Độ ưu tiên"
-              allowClear
-            >
-              <Option value="all">Tất cả ưu tiên</Option>
-              <Option value="high">Cao</Option>
-              <Option value="medium">Trung bình</Option>
-              <Option value="low">Thấp</Option>
-            </Select>
-          </Col>
-          <Col xs={24} md={8} style={{ textAlign: 'right' }}>
-            <Space>
-              <Button
-                icon={<AppstoreOutlined />}
-                type={viewMode === 'grid' ? 'primary' : 'default'}
-                onClick={() => setViewMode('grid')}
-              >
-                Grid
-              </Button>
-              <Button
-                icon={<UnorderedListOutlined />}
-                type={viewMode === 'list' ? 'primary' : 'default'}
-                onClick={() => setViewMode('list')}
-              >
-                List
-              </Button>
-            </Space>
-          </Col>
+          
+          {isMobile ? (
+            <Col xs={24}>
+              <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
+                <Dropdown overlay={filterMenu} trigger={['click']}>
+                  <Button icon={<FilterOutlined />} size="middle">
+                    Lọc
+                  </Button>
+                </Dropdown>
+                
+                <Space>
+                  <Button
+                    icon={<AppstoreOutlined />}
+                    type={viewMode === 'grid' ? 'primary' : 'default'}
+                    onClick={() => setViewMode('grid')}
+                    size="middle"
+                  />
+                  <Button
+                    icon={<UnorderedListOutlined />}
+                    type={viewMode === 'list' ? 'primary' : 'default'}
+                    onClick={() => setViewMode('list')}
+                    size="middle"
+                  />
+                </Space>
+              </Space>
+              
+              {/* Show active filters on mobile */}
+              {(filterStatus !== 'all' || filterPriority !== 'all') && (
+                <div style={{ marginTop: 8 }}>
+                  <Space wrap size={4}>
+                    {filterStatus !== 'all' && (
+                      <Tag closable onClose={() => setFilterStatus('all')} size="small">
+                        Trạng thái: {filterStatus === 'in-progress' ? 'Đang làm' : 
+                                   filterStatus === 'not-started' ? 'Chưa bắt đầu' :
+                                   filterStatus === 'completed' ? 'Hoàn thành' :
+                                   filterStatus === 'on-hold' ? 'Tạm dừng' : filterStatus}
+                      </Tag>
+                    )}
+                    {filterPriority !== 'all' && (
+                      <Tag closable onClose={() => setFilterPriority('all')} size="small">
+                        Ưu tiên: {filterPriority === 'high' ? 'Cao' : 
+                                filterPriority === 'medium' ? 'TB' : 'Thấp'}
+                      </Tag>
+                    )}
+                  </Space>
+                </div>
+              )}
+            </Col>
+          ) : (
+            <>
+              <Col xs={12} sm={12} md={4} lg={4}>
+                <Select
+                  value={filterStatus}
+                  onChange={setFilterStatus}
+                  style={{ width: '100%' }}
+                  placeholder="Trạng thái"
+                  allowClear
+                  size="middle"
+                >
+                  <Option value="all">Tất cả trạng thái</Option>
+                  <Option value="not-started">Chưa bắt đầu</Option>
+                  <Option value="in-progress">Đang thực hiện</Option>
+                  <Option value="on-hold">Tạm dừng</Option>
+                  <Option value="completed">Hoàn thành</Option>
+                  <Option value="cancelled">Đã hủy</Option>
+                </Select>
+              </Col>
+              <Col xs={12} sm={12} md={4} lg={4}>
+                <Select
+                  value={filterPriority}
+                  onChange={setFilterPriority}
+                  style={{ width: '100%' }}
+                  placeholder="Độ ưu tiên"
+                  allowClear
+                  size="middle"
+                >
+                  <Option value="all">Tất cả ưu tiên</Option>
+                  <Option value="high">Cao</Option>
+                  <Option value="medium">Trung bình</Option>
+                  <Option value="low">Thấp</Option>
+                </Select>
+              </Col>
+              <Col xs={24} sm={24} md={8} lg={8} style={{ textAlign: 'right' }}>
+                <Space wrap>
+                  <Button
+                    icon={<AppstoreOutlined />}
+                    type={viewMode === 'grid' ? 'primary' : 'default'}
+                    onClick={() => setViewMode('grid')}
+                    size="middle"
+                  >
+                    Grid
+                  </Button>
+                  <Button
+                    icon={<UnorderedListOutlined />}
+                    type={viewMode === 'list' ? 'primary' : 'default'}
+                    onClick={() => setViewMode('list')}
+                    size="middle"
+                  >
+                    List
+                  </Button>
+                </Space>
+              </Col>
+            </>
+          )}
         </Row>
 
         {isManager() && selectedRowKeys.length > 0 && (
-          <Row style={{ marginTop: 16 }}>
+          <Row style={{ marginTop: 16 }} className="bulk-actions-row">
             <Col span={24}>
-              <Space>
+              <Space wrap>
                 <span>Đã chọn {selectedRowKeys.length} dự án:</span>
                 <Select
                   placeholder="Cập nhật trạng thái"
-                  style={{ width: 150 }}
+                  style={{ width: isMobile ? 120 : 150 }}
                   onChange={(value) => handleChangeMultiple('status', value)}
+                  size="middle"
                 >
                   <Option value="not-started">Chưa bắt đầu</Option>
                   <Option value="in-progress">Đang thực hiện</Option>
@@ -677,8 +851,9 @@ const handleDeleteProject = async (projectId) => {
                 </Select>
                 <Select
                   placeholder="Cập nhật độ ưu tiên"
-                  style={{ width: 150 }}
+                  style={{ width: isMobile ? 120 : 150 }}
                   onChange={(value) => handleChangeMultiple('priority', value)}
+                  size="middle"
                 >
                   <Option value="low">Thấp</Option>
                   <Option value="medium">Trung bình</Option>
@@ -687,8 +862,9 @@ const handleDeleteProject = async (projectId) => {
                 <Button
                   danger
                   onClick={() => handleChangeMultiple('delete', true)}
+                  size="middle"
                 >
-                  Xóa đã chọn
+                  {isMobile ? 'Xóa đã chọn' : 'Xóa đã chọn'}
                 </Button>
               </Space>
             </Col>
@@ -696,62 +872,93 @@ const handleDeleteProject = async (projectId) => {
         )}
       </Card>
 
+      {/* Projects List/Grid */}
       {viewMode === 'grid' ? (
         filteredProjects.length === 0 ? (
-          <Card>
+          <Card className="empty-projects-card">
             <Empty
-              description="Không tìm thấy dự án nào"
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={
+                <div>
+                  <div style={{ fontSize: isMobile ? 14 : 16, marginBottom: 8 }}>
+                    Không tìm thấy dự án nào
+                  </div>
+                  {searchText && (
+                    <Text type="secondary" style={{ fontSize: isMobile ? 12 : 13 }}>
+                      Thử tìm kiếm với từ khóa khác
+                    </Text>
+                  )}
+                </div>
+              }
+              image={isMobile ? Empty.PRESENTED_IMAGE_SIMPLE : Empty.PRESENTED_IMAGE_DEFAULT}
+              imageStyle={{
+                height: isMobile ? 80 : 120,
+              }}
             />
           </Card>
         ) : (
-          <Row gutter={[16, 16]}>
+          <Row gutter={[16, 16]} className="projects-grid">
             {filteredProjects.map(project => (
               <Col 
                 key={project._id} 
                 xs={24} 
                 sm={12} 
-                lg={8}
+                md={8} 
+                lg={6}
                 xl={6}
+                className="project-col"
               >
-                <ProjectCard
-                  project={{
-                    _id: project._id, // THÊM _id
-                    id: project._id,
-                    // DÙNG CÙNG FIELD NAMES VỚI API
-                    title: project.title, // THAY name bằng title
-                    content: project.content, // THAY description bằng content
-                    status: project.status,
-                    priority: project.priority,
-                    thumbnail: project.thumbnail,
-                    timeStart: project.timeStart, // THAY startDate bằng timeStart
-                    timeFinish: project.timeFinish, // THAY dueDate bằng timeFinish
-                    createdBy: project.createdBy,
-                    listUser: project.listUser || [],
-                    createdAt: project.createdAt,
-                  }}
-                  currentUser={currentUser}
-                  currentUserId={currentUserId}
-                  users = {users}
-                  onView={handleViewProject}
-                  onEdit={canEditProject(project) ? handleEditProject : undefined}
-                  onDelete={canDeleteProject(project) ? handleDeleteProject : undefined}
-                />
+                <div className="project-card-wrapper">
+                  <ProjectCard
+                    project={{
+                      _id: project._id,
+                      id: project._id,
+                      title: project.title,
+                      content: project.content,
+                      status: project.status,
+                      priority: project.priority,
+                      thumbnail: project.thumbnail,
+                      timeStart: project.timeStart,
+                      timeFinish: project.timeFinish,
+                      createdBy: project.createdBy,
+                      listUser: project.listUser || [],
+                      createdAt: project.createdAt,
+                    }}
+                    currentUser={currentUser}
+                    currentUserId={currentUserId}
+                    users={users}
+                    onView={handleViewProject}
+                    onEdit={canEditProject(project) ? handleEditProject : undefined}
+                    onDelete={canDeleteProject(project) ? handleDeleteProject : undefined}
+                    isMobile={isMobile}
+                  />
+                </div>
               </Col>
             ))}
           </Row>
         )
       ) : (
-        <Card>
-          <Table
-            rowSelection={isManager() ? rowSelection : undefined}
-            columns={columns}
-            dataSource={filteredProjects}
-            rowKey="_id"
-            pagination={pagination}
-            loading={loading}
-            onChange={handleTableChange}
-          />
+        <Card className="projects-table-card">
+          <div style={{ overflowX: 'auto' }}>
+            <Table
+              rowSelection={isManager() ? rowSelection : undefined}
+              columns={columns}
+              dataSource={filteredProjects}
+              rowKey="_id"
+              pagination={{
+                ...pagination,
+                showSizeChanger: !isMobile,
+                showQuickJumper: !isMobile,
+                showTotal: (total, range) => 
+                  isMobile ? `${range[0]}-${range[1]} / ${total}` : 
+                  `Hiển thị ${range[0]}-${range[1]} trong tổng ${total} dự án`,
+                size: isMobile ? "small" : "default"
+              }}
+              loading={loading}
+              onChange={handleTableChange}
+              scroll={isMobile ? { x: 800 } : undefined}
+              size={isMobile ? "small" : "default"}
+            />
+          </div>
         </Card>
       )}
 
@@ -761,8 +968,9 @@ const handleDeleteProject = async (projectId) => {
           open={modalVisible}
           onCancel={handleModalCancel}
           footer={null}
-          width={700}
+          width={modalWidth}
           destroyOnClose
+          centered
         >
           <ProjectForm
             visible={modalVisible}
@@ -776,6 +984,7 @@ const handleDeleteProject = async (projectId) => {
             isParentProject={true}
             autoAssignToCreator={!editingProject}
             isCreatingTask={false}
+            isMobile={isMobile}
           />
         </Modal>
       )}

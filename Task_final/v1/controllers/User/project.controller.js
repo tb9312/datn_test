@@ -387,7 +387,7 @@ module.exports.create = async (req, res) => {
       type: "CREATE_PROJECT",
       title: "Bạn được tham gia vào dự án mới",
       message: `Project: ${savedTask.title}`,
-      url: `/projects/detail/${savedTask._id}`,
+      url: `/projects/detail/${savedTask._id}/subproject/${savedTask.projectParentId}`,
       priority: savedTask.priority,
     }));
 
@@ -541,7 +541,7 @@ module.exports.createHot = async (req, res) => {
         type: "CREATE_PROJECT",
         title: "Bạn được tham gia vào dự án khẩn cấp mới",
         message: `Project: ${savedTask.title}`,
-        url: `/projects/detail/${savedTask._id}`,
+        url: `/projects/detail/${savedTask._id}/subproject/${savedTask.projectParentId}`,
         priority: savedTask.priority || "HIGH",
       }));
 
@@ -627,25 +627,31 @@ module.exports.refuseProject = async (req, res) => {
     );
 
     /* =========================
-       6. TẠO THÔNG BÁO CHO MANAGER
-    ========================== */
-    if (project.manager) {
-      await Notification.create({
-        user_id: project.manager,
+   6. TẠO THÔNG BÁO CHO MANAGER & CREATOR
+========================== */
+
+    // Gom danh sách người nhận
+    const receivers = [
+      project.manager?.toString(),
+      project.createdBy?.toString(),
+    ].filter((uid, index, self) => uid && self.indexOf(uid) === index);
+
+    if (receivers.length > 0) {
+      const notifications = receivers.map((receiverId) => ({
+        user_id: receiverId,
         sender: userId,
         type: "REFUSE_PROJECT",
         title: "Thành viên từ chối tham gia dự án",
         message: `${req.user.fullName || "Một thành viên"} đã từ chối dự án "${
           project.title
         }"`,
-        url: `/projects/detail/${project._id}`,
+        url: `/projects/detail/${project._id}/subproject/${project.projectParentId}`,
         priority: project.priority || "MEDIUM",
-      });
-    }
+      }));
 
-    /* =========================
-       7. RESPONSE
-    ========================== */
+      await Notification.insertMany(notifications);
+    }
+    //  7. RESPONSE
     return res.status(200).json({
       success: true,
       message: "Từ chối tham gia dự án thành công",
@@ -711,7 +717,7 @@ module.exports.edit = async (req, res) => {
       type: "PROJECT",
       title: "Dự án vừa được cập nhật",
       message: `Project: ${updatedProject.title}`,
-      url: `/projects/${updatedProject._id}`,
+      url: `/projects/detail/${updatedProject._id}/subproject/${updatedProject.projectParentId}`,
       priority: updatedProject.priority || "MEDIUM",
     }));
 
@@ -781,7 +787,7 @@ module.exports.editHot = async (req, res) => {
       type: "PROJECT",
       title: "Dự án khẩn cấp vừa được cập nhật",
       message: `Project: ${updatedProject.title}`,
-      url: `/projects/${updatedProject._id}`,
+      url: `/projects/detail/${updatedProject._id}/subproject/${updatedProject.projectParentId}`,
       priority: updatedProject.priority || "MEDIUM",
     }));
 
@@ -943,7 +949,7 @@ module.exports.delete = async (req, res) => {
       type: "PROJECT",
       title: "Dự án bạn tham gia đã bị xoá",
       message: `Project: ${project.title}`,
-      url: `/projects/${project._id}`,
+      url: `/projects/detail/${project._id}/subproject/${project.projectParentId}`,
       priority: project.priority || "MEDIUM",
     }));
 
