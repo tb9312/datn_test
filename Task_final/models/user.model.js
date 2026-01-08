@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-
+    position_job: String,
     password: {
       type: String,
       required: true,
