@@ -168,6 +168,7 @@ const EventForm = ({
           <Form.Item
             name="description"
             label="Mô tả"
+            rules ={[{ required: true }]}
           >
             <TextArea 
               rows={3} 
@@ -304,6 +305,7 @@ const EventForm = ({
       <Form.Item
         name="participants"
         label="Thành viên tham gia"
+        rules ={[{ required: true }]}
       >
         <Select
           mode="multiple"
@@ -348,6 +350,7 @@ const EventForm = ({
       <Form.Item
         name="location"
         label="Địa điểm"
+        rules ={[{ required: true }]}
       >
         <Input 
           placeholder="Nhập địa điểm..." 

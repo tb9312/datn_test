@@ -987,6 +987,11 @@ const ProjectDetailContent = () => {
                     dataSource={subProjects}
                     size={isMobile ? "small" : "default"}
                     renderItem={(subProject) => {
+                      console.log("=== DEBUG SUBPROJECT ===");
+  console.log("Title:", subProject.title);
+  console.log("statusHot:", subProject.statusHot);
+  console.log("Type of statusHot:", typeof subProject.statusHot);
+  console.log("Full subProject data:", subProject);
                       const subProjectCreator = getUserInfo(
                         subProject.createdBy
                       );
@@ -1140,19 +1145,19 @@ const ProjectDetailContent = () => {
                                       : subProject.title}
                                   </span>
                                   <div className="subproject-tags">
-                                    {subProject.statusHot && (
-                                  <Tag 
-                                    color="red" 
-                                    size="small"
-                                    icon={<FireOutlined />}
-                                    style={{ 
-                                      fontWeight: 500,
-                                      borderColor: '#ff4d4f'
-                                    }}
-                                  >
-                                    {isMobile ? "Đột xuất" : "Công việc đột xuất"}
-                                  </Tag>
-                                )}
+                                    {(subProject.statusHot === true || subProject.statusHot === "true") && (
+                                    <Tag 
+                                      color="red" 
+                                      size="small"
+                                      icon={<FireOutlined />}
+                                      style={{ 
+                                        fontWeight: 500,
+                                        borderColor: '#ff4d4f'
+                                      }}
+                                    >
+                                      {isMobile ? "Đột xuất" : "Công việc đột xuất"}
+                                    </Tag>
+                                  )}
                                     {subProjectCreator && (
                                       <Tag
                                         color={
@@ -1550,14 +1555,14 @@ const ProjectDetailContent = () => {
           centered
         >
           <div className="hot-task-modal">
-            <Alert
+            {/* <Alert
               message="CÔNG VIỆC ĐỘT XUẤT - DÀNH CHO MANAGER"
               description="Công việc này sẽ được ưu tiên cao nhất. Hệ thống đã đề xuất các thành viên phù hợp nhất dựa trên kỹ năng và hiệu suất."
               type="warning"
               showIcon
               icon={<FireOutlined />}
               style={{ marginBottom: 16 }}
-            />
+            /> */}
 
             <ProjectForm
               visible={hotTaskModalVisible}

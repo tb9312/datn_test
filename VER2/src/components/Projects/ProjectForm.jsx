@@ -435,7 +435,7 @@ const ProjectForm = ({
           <Form.Item
             name="timeFinish"
             label="Hạn hoàn thành"
-            rules={[{ validator: validateDates }]}
+            rules={[{ required: true, validator: validateDates }]}
           >
             <DatePicker
               style={{ width: "100%" }}
@@ -527,6 +527,7 @@ const ProjectForm = ({
           <Form.Item
             name="listUser"
             label="Thành viên tham gia"
+            rules ={[{ required: true }]}
             valuePropName="value" // Thêm dòng này
           >
             {customUserSelect ? (

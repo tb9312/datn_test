@@ -47,16 +47,24 @@ module.exports.getDashboard = async (req, res) => {
     };
 
     //Project.
+    // 1. Tìm tất cả dự án cha KHÔNG bị xóa
+    const validParentProjects = await Project.find({
+      deleted: false,
+      projectParentId: { $exists: false }, // Dự án cha (không có parent)
+    }).select("_id");
+
+    const validParentIds = validParentProjects.map((p) => p._id);
+
+    // 2. Đếm dự án con thuộc các parent hợp lệ
     const totalTeamTasks = await Project.countDocuments({
       deleted: false,
-      projectParentId: { $exists: true, $ne: null },
-      assignee_id: { $exists: true, $ne: null, $ne: "" }, // Phải có assignee
+      projectParentId: { $in: validParentIds }, // Chỉ parent hợp lệ
       $or: [
-        { assignee_id: userId },
-        { listUser: userId.toString() },
+        { listUser: { $in: [userId, userId.toString()] } },
         { createdBy: userId },
       ],
     });
+    
     // Tổng số Project
     const totalProjects = await Project.countDocuments({
       deleted: false,

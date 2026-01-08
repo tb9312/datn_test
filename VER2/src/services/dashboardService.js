@@ -117,6 +117,7 @@ export const dashboardService = {
         tasks: {
           totalTasks: apiResponse.tasks?.totalTasks || 0,
           pendingTasks: apiResponse.tasks?.pendingTasks || 0,
+          teamTasks: apiResponse.tasks?.teamTasks || 0,
           productivity: apiResponse.tasks?.productivity || 0,
           chartData: apiResponse.tasks?.chartData || {
             todo: 0,
@@ -145,6 +146,7 @@ export const dashboardService = {
         tasks: {
           totalTasks: apiResponse.tasks?.totalTasks || 0,
           pendingTasks: apiResponse.tasks?.pendingTasks || 0,
+          teamTasks: apiResponse.tasks?.teamTasks || 0,
           productivity: apiResponse.tasks?.productivity || 0,
           chartData: apiResponse.tasks?.chartData || {
             todo: 0,

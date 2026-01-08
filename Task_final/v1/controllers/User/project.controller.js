@@ -387,7 +387,7 @@ module.exports.create = async (req, res) => {
       type: "CREATE_PROJECT",
       title: "Bạn được tham gia vào dự án mới",
       message: `Project: ${savedTask.title}`,
-      url: `/projects/detail/${savedTask._id}/subproject/${savedTask.projectParentId}`,
+      url: `/projects/detail/${savedTask.projectParentId}/subproject/${savedTask._id}`,
       priority: savedTask.priority,
     }));
 
@@ -541,7 +541,7 @@ module.exports.createHot = async (req, res) => {
         type: "CREATE_PROJECT",
         title: "Bạn được tham gia vào dự án khẩn cấp mới",
         message: `Project: ${savedTask.title}`,
-        url: `/projects/detail/${savedTask._id}/subproject/${savedTask.projectParentId}`,
+        url: `/projects/detail/${savedTask.projectParentId}/subproject/${savedTask._id}`,
         priority: savedTask.priority || "HIGH",
       }));
 
@@ -645,7 +645,7 @@ module.exports.refuseProject = async (req, res) => {
         message: `${req.user.fullName || "Một thành viên"} đã từ chối dự án "${
           project.title
         }"`,
-        url: `/projects/detail/${project._id}/subproject/${project.projectParentId}`,
+        url: `/projects/detail/${project.projectParentId}/subproject/${project._id}`,
         priority: project.priority || "MEDIUM",
       }));
 
@@ -787,7 +787,7 @@ module.exports.editHot = async (req, res) => {
       type: "PROJECT",
       title: "Dự án khẩn cấp vừa được cập nhật",
       message: `Project: ${updatedProject.title}`,
-      url: `/projects/detail/${updatedProject._id}/subproject/${updatedProject.projectParentId}`,
+      url: `/projects/detail/${updatedProject.projectParentId}/subproject/${updatedProject._id}`,
       priority: updatedProject.priority || "MEDIUM",
     }));
 
